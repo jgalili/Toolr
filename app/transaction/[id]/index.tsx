@@ -4,21 +4,16 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { OwnerCard } from '@/components/domain/OwnerCard';
-import { LoanBadge } from '@/components/domain/ToolCard';
 import { Button, Card, ErrorState, Screen, Skeleton, Text } from '@/components/primitives';
-import { useConfirmPickup, useConfirmReturn, useTransaction } from '@/features/transactions/hooks';
-import { isLiveLoan, loanLine, nextAction } from '@/features/transactions/loanState';
+import { useConfirmPickup, useTransaction } from '@/features/transactions/hooks';
 import { currentLocale } from '@/i18n';
 import { formatDayTime, formatMoney } from '@/lib/format';
 import { useTheme } from '@/theme';
 import type { TransactionStatus } from '@/types/domain';
 
-// The five states a loan actually passes through, in the order they happen.
-// "Reserved" earns its own row: it is the step people were mistaking for
-// "borrowed", and a timeline that skips it cannot show them the difference.
 const STEPS: { key: string; reached: TransactionStatus[] }[] = [
   { key: 'requested', reached: ['agreed', 'picked_up', 'returned', 'completed'] },
-  { key: 'reserved', reached: ['agreed', 'picked_up', 'returned', 'completed'] },
+  { key: 'accepted', reached: ['agreed', 'picked_up', 'returned', 'completed'] },
   { key: 'pickedUp', reached: ['picked_up', 'returned', 'completed'] },
   { key: 'returned', reached: ['returned', 'completed'] },
   { key: 'rated', reached: ['completed'] },
@@ -32,7 +27,6 @@ export default function TransactionDetail() {
 
   const { data: tx, isPending, error, refetch } = useTransaction(id);
   const confirmPickup = useConfirmPickup();
-  const confirmReturn = useConfirmReturn();
 
   if (isPending) {
     return (
@@ -54,14 +48,11 @@ export default function TransactionDetail() {
     );
   }
 
-  const step = nextAction(tx);
-
   return (
     <Screen scroll>
       <View style={{ paddingTop: spacing.xl, gap: spacing.xl }}>
         <View style={{ gap: spacing.xs }}>
           <Text variant="title">{tx.toolTitle}</Text>
-          {isLiveLoan(tx) ? <LoanBadge line={loanLine(tx, currentLocale())} /> : null}
           <Text variant="body" tone="muted">
             {t('transaction.dueBack', { when: formatDayTime(tx.dueAt, currentLocale()) })}
           </Text>
@@ -132,34 +123,37 @@ export default function TransactionDetail() {
           ) : null}
 
           {tx.status === 'agreed' ? (
+            <>
+              <Button
+                size="large"
+                label={t('transaction.pickupTitle')}
+                onPress={() => router.push(`/transaction/${tx.id}/pickup`)}
+              />
+              {tx.viewerRole === 'borrower' ? (
+                <Button
+                  label={t('transaction.iPickedItUp')}
+                  variant="secondary"
+                  loading={confirmPickup.isPending}
+                  onPress={() => confirmPickup.mutate(tx.id)}
+                />
+              ) : null}
+            </>
+          ) : null}
+
+          {tx.status === 'picked_up' || tx.status === 'returned' ? (
             <Button
               size="large"
-              label={t('transaction.pickupTitle')}
-              variant="secondary"
-              onPress={() => router.push(`/transaction/${tx.id}/pickup`)}
+              label={t('transaction.steps.returned')}
+              onPress={() => router.push(`/transaction/${tx.id}/return`)}
             />
           ) : null}
 
-          {/* One primary action, decided in one place. Either side may record
-              the handover; only the owner can confirm the tool is back. */}
-          {step ? (
+          {tx.status === 'returned' && !tx.hasRated ? (
             <Button
               size="large"
-              label={t(step.key)}
-              loading={confirmPickup.isPending || confirmReturn.isPending}
-              onPress={() => {
-                if (step.action === 'pickup') return void confirmPickup.mutate(tx.id);
-                if (step.action === 'confirmReturn') return void confirmReturn.mutate(tx.id);
-                if (step.action === 'return') return router.push(`/transaction/${tx.id}/return`);
-                return router.push(`/transaction/${tx.id}/rate`);
-              }}
+              label={t('rating.title')}
+              onPress={() => router.push(`/transaction/${tx.id}/rate`)}
             />
-          ) : null}
-
-          {tx.viewerRole === 'owner' && tx.status === 'picked_up' ? (
-            <Text variant="caption" tone="muted">
-              {t('loan.notInSearch')}
-            </Text>
           ) : null}
 
           <Button

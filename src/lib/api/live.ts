@@ -163,11 +163,12 @@ export const liveSource: DataSource = {
     const supabase = requireSupabase();
     const { data, error } = await supabase
       .from('tools')
+      // PostgREST parses `select` as a URL parameter, not as SQL: a newline
+      // anywhere in it is a hard 400 (PGRST100), and supabase-js reports that
+      // as an ordinary query error, so the screen just renders empty. Keep
+      // every select on ONE line. tests/apiSelects.test.ts enforces it.
       .select(
-        `*, tool_categories(slug), tool_photos(storage_path, position),
-         tool_pickup_windows(weekday, start_time, end_time),
-         tool_included_items(label, icon, position),
-         profiles!tools_owner_id_fkey(*)`,
+        '*, tool_categories(slug), tool_photos(storage_path, position), tool_pickup_windows(weekday, start_time, end_time), tool_included_items(label, icon, position), profiles!tools_owner_id_fkey(*)',
       )
       .eq('id', id)
       .maybeSingle();
@@ -435,12 +436,13 @@ export const liveSource: DataSource = {
     const supabase = requireSupabase();
     const { data, error } = await supabase
       .from('transactions')
+      // One line (see getTool), and the conversation is reached THROUGH the
+      // request: there is no foreign key from transactions to conversations --
+      // both point at borrow_requests -- so a direct `conversations(id)` embed
+      // is a 400 (PGRST200), which is what left this list empty and with it
+      // every "mark it picked up" control in the app.
       .select(
-        `*, tools(title, tool_photos(storage_path, position)),
-         borrow_requests(start_at),
-         owner:profiles!transactions_owner_id_fkey(id, first_name, avatar_url, rating_sum_owner, rating_count_owner),
-         borrower:profiles!transactions_borrower_id_fkey(id, first_name, avatar_url, rating_sum_borrower, rating_count_borrower),
-         conversations(id), ratings(rater_id)`,
+        '*, tools(title, tool_photos(storage_path, position)), borrow_requests(start_at, conversations(id)), owner:profiles!transactions_owner_id_fkey(id, first_name, avatar_url, rating_sum_owner, rating_count_owner), borrower:profiles!transactions_borrower_id_fkey(id, first_name, avatar_url, rating_sum_borrower, rating_count_borrower), ratings(rater_id)',
       )
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -528,10 +530,7 @@ export const liveSource: DataSource = {
     const { data, error } = await supabase
       .from('conversations')
       .select(
-        `*, tools(title, tool_photos(storage_path, position)),
-         owner:profiles!conversations_owner_id_fkey(id, first_name, avatar_url),
-         borrower:profiles!conversations_borrower_id_fkey(id, first_name, avatar_url),
-         messages(body, created_at, read_at, sender_id)`,
+        '*, tools(title, tool_photos(storage_path, position)), owner:profiles!conversations_owner_id_fkey(id, first_name, avatar_url), borrower:profiles!conversations_borrower_id_fkey(id, first_name, avatar_url), messages(body, created_at, read_at, sender_id)',
       )
       .order('last_message_at', { ascending: false, nullsFirst: false });
     if (error) throw error;
@@ -914,6 +913,20 @@ async function ownerTools(ownerId: string, statuses: string[]): Promise<ToolSumm
   }));
 }
 
+/**
+ * The conversation id, wherever PostgREST decided to put it.
+ *
+ * `conversations.request_id` is UNIQUE, so the nested embed comes back as an
+ * object -- but a to-many would come back as an array, and a shape assumption
+ * that is wrong by one bracket is exactly how this data went missing in the
+ * first place. Accept both.
+ */
+function conversationIdOf(row: any): string | null {
+  const nested = row.borrow_requests?.conversations;
+  if (Array.isArray(nested)) return nested[0]?.id ?? null;
+  return nested?.id ?? null;
+}
+
 function mapTransaction(row: any, userId: string): Transaction {
   const isOwner = row.owner_id === userId;
   const other = isOwner ? row.borrower : row.owner;
@@ -943,7 +956,7 @@ function mapTransaction(row: any, userId: string): Transaction {
     returnedAt: row.returned_at,
     ownerConfirmedReturn: row.owner_confirmed_return_at != null,
     completedAt: row.completed_at,
-    conversationId: row.conversations?.[0]?.id ?? null,
+    conversationId: conversationIdOf(row),
     hasRated: (row.ratings ?? []).some((r: any) => r.rater_id === userId),
   };
 }

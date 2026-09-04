@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Text } from '@/components/primitives';
-import type { LoanLine } from '@/features/transactions/loanState';
 import { currentLocale } from '@/i18n';
 import { formatDistance, formatMoney, formatRating } from '@/lib/format';
 import { useTheme } from '@/theme';
@@ -12,34 +11,6 @@ import type { ToolSummary } from '@/types/domain';
 
 import { Icon } from './Icon';
 import { ToolIllustration } from './ToolIllustration';
-
-/**
- * "Borrowed · back 14 Sep", "Reserved 12-14 Sep", "Lent to Dana · due 14 Sep".
- *
- * One component, because the sentence changes with who is looking but the shape
- * never does: a small coloured dot and a line of text under the title. The text
- * itself is decided in `loanState`, so the card does not have to know the
- * difference between a reservation and a loan.
- */
-export function LoanBadge({ line }: { line: LoanLine }) {
-  const { t } = useTranslation();
-  const { colors, spacing } = useTheme();
-  const dot =
-    line.tone === 'danger' ? colors.danger : line.tone === 'accent' ? colors.accent : colors.textMuted;
-
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dot }} />
-      <Text
-        variant="caption"
-        numberOfLines={1}
-        style={{ color: dot, flexShrink: 1 }}
-      >
-        {t(line.key, line.values)}
-      </Text>
-    </View>
-  );
-}
 
 /**
  * The price line. FREE is a word, not a zero — the free listings are the point
@@ -97,8 +68,6 @@ type Props = {
   onBorrow?: () => void;
   onToggleFavorite?: () => void;
   variant?: 'listing' | 'tile';
-  /** What is happening with this tool right now. Omitted means nothing is. */
-  loan?: LoanLine | null;
 };
 
 function Thumbnail({ tool, size }: { tool: ToolSummary; size: number }) {
@@ -137,14 +106,7 @@ function Thumbnail({ tool, size }: { tool: ToolSummary; size: number }) {
  * question. The card itself is tappable for the full detail; the button is the
  * shortcut for someone who has already decided.
  */
-export function ToolCard({
-  tool,
-  onPress,
-  onBorrow,
-  onToggleFavorite,
-  variant = 'listing',
-  loan,
-}: Props) {
+export function ToolCard({ tool, onPress, onBorrow, onToggleFavorite, variant = 'listing' }: Props) {
   const { t } = useTranslation();
   const { colors, radius, spacing, shadow } = useTheme();
 
@@ -199,7 +161,6 @@ export function ToolCard({
             {tool.title}
           </Text>
           <DistanceLine tool={tool} />
-          {loan ? <LoanBadge line={loan} /> : null}
           <PriceLabel tool={tool} />
         </View>
       </Pressable>
@@ -238,7 +199,6 @@ export function ToolCard({
         </View>
 
         <DistanceLine tool={tool} />
-        {loan ? <LoanBadge line={loan} /> : null}
 
         <View
           style={{

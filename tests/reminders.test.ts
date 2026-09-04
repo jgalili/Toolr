@@ -1,6 +1,5 @@
 import { planReminders, type ReminderStrings } from '../src/features/transactions/reminders';
-
-import { tx } from './factories';
+import type { Transaction } from '../src/types/domain';
 
 const strings: ReminderStrings = {
   dayBeforeTitle: 'day-before',
@@ -12,6 +11,30 @@ const strings: ReminderStrings = {
   lendingOverdueTitle: 'lending-overdue',
   lendingOverdueBody: (tool, name) => `lending:${tool}:${name}`,
 };
+
+function tx(over: Partial<Transaction>): Transaction {
+  return {
+    id: 't1',
+    requestId: 'r1',
+    toolId: 'tool1',
+    toolTitle: 'Drill',
+    toolPhotoUrl: null,
+    ownerId: 'o',
+    borrowerId: 'b',
+    counterparty: { id: 'o', firstName: 'Daniel', avatarUrl: null, rating: null },
+    viewerRole: 'borrower',
+    status: 'picked_up',
+    agreedTotalAgorot: null,
+    currency: 'ILS',
+    dueAt: '2026-09-10T18:00:00.000Z',
+    pickedUpAt: null,
+    returnedAt: null,
+    completedAt: null,
+    conversationId: null,
+    hasRated: false,
+    ...over,
+  };
+}
 
 const now = new Date('2026-09-08T09:00:00.000Z');
 

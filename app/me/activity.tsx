@@ -3,11 +3,10 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, View } from 'react-native';
 
-import { LoanBadge } from '@/components/domain/ToolCard';
 import { Card, EmptyState, Screen, SegmentedControl, Text } from '@/components/primitives';
 import { useTransactions } from '@/features/transactions/hooks';
-import { isLiveLoan, loanLine } from '@/features/transactions/loanState';
 import { currentLocale } from '@/i18n';
+import { formatDayTime } from '@/lib/format';
 import { useTheme } from '@/theme';
 import type { Transaction } from '@/types/domain';
 
@@ -21,10 +20,18 @@ import type { Transaction } from '@/types/domain';
  * so they are now different tabs, and the tab you asked for is the tab you get.
  */
 
+const LIVE: Transaction['status'][] = ['agreed', 'picked_up', 'returned'];
+
+function statusKey(status: Transaction['status']): string {
+  if (status === 'picked_up') return 'pickedUp';
+  if (status === 'agreed') return 'accepted';
+  return status;
+}
+
 export default function Activity() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { spacing } = useTheme();
+  const { spacing, colors } = useTheme();
   const { data } = useTransactions();
   const params = useLocalSearchParams<{ role?: string }>();
 
@@ -36,8 +43,8 @@ export default function Activity() {
     .filter((tx) => tx.viewerRole === role)
     // Live borrows first, soonest deadline at the top; finished ones below.
     .sort((a, b) => {
-      const aLive = isLiveLoan(a);
-      const bLive = isLiveLoan(b);
+      const aLive = LIVE.includes(a.status);
+      const bLive = LIVE.includes(b.status);
       if (aLive !== bLive) return aLive ? -1 : 1;
       return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
     });
@@ -66,23 +73,44 @@ export default function Activity() {
             title={role === 'borrower' ? t('empty.noBorrowing') : t('empty.noLending')}
           />
         }
-        renderItem={({ item }) => (
-          <Card
-            onPress={() => router.push(`/transaction/${item.id}`)}
-            accessibilityLabel={item.toolTitle}
-          >
-            <View style={{ gap: 4 }}>
-              <Text variant="bodyStrong">{item.toolTitle}</Text>
-              {isLiveLoan(item) ? (
-                <LoanBadge line={loanLine(item, currentLocale())} />
-              ) : (
+        renderItem={({ item }) => {
+          const overdue = LIVE.includes(item.status) && new Date(item.dueAt).getTime() < Date.now();
+          return (
+            <Card
+              onPress={() => router.push(`/transaction/${item.id}`)}
+              accessibilityLabel={item.toolTitle}
+            >
+              <View style={{ gap: 2 }}>
+                <Text variant="bodyStrong">{item.toolTitle}</Text>
                 <Text variant="caption" tone="muted">
-                  {t(`transaction.steps.${item.status === 'completed' ? 'rated' : 'returned'}`)}
+                  {role === 'borrower'
+                    ? t('home.youHave', {
+                        tool: item.toolTitle,
+                        name: item.counterparty.firstName,
+                      })
+                    : t('home.theyHave', {
+                        tool: item.toolTitle,
+                        name: item.counterparty.firstName,
+                      })}
+                  {' · '}
+                  {t(`transaction.steps.${statusKey(item.status)}`, {
+                    defaultValue: item.status,
+                  })}
                 </Text>
-              )}
-            </View>
-          </Card>
-        )}
+                <Text
+                  variant="caption"
+                  style={{ color: overdue ? colors.danger : colors.textMuted }}
+                >
+                  {overdue
+                    ? t('home.wasDue', { when: formatDayTime(item.dueAt, currentLocale()) })
+                    : t('transaction.dueBack', {
+                        when: formatDayTime(item.dueAt, currentLocale()),
+                      })}
+                </Text>
+              </View>
+            </Card>
+          );
+        }}
       />
     </Screen>
   );

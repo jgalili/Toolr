@@ -16,10 +16,10 @@ export default function ReturnConfirmation() {
   const { data: tx } = useTransaction(id);
   const confirm = useConfirmReturn();
 
-  const owner = tx?.viewerRole === 'owner';
-  const question = owner
-    ? t('transaction.returnQuestionOwner', { tool: tx?.toolTitle ?? '' })
-    : t('transaction.returnQuestionBorrower', { tool: tx?.toolTitle ?? '' });
+  const question =
+    tx?.viewerRole === 'owner'
+      ? t('transaction.returnQuestionOwner', { tool: tx?.toolTitle ?? '' })
+      : t('transaction.returnQuestionBorrower', { tool: tx?.toolTitle ?? '' });
 
   return (
     <Screen>
@@ -28,17 +28,10 @@ export default function ReturnConfirmation() {
           {question}
         </Text>
 
-        {/* Say what the tap actually does to the listing. The asymmetry is the
-            point and it should not be a surprise: the borrower's word marks it
-            returned, the owner's word puts it back on the map. */}
-        <Text variant="body" tone="muted" center>
-          {owner ? t('loan.backInSearch') : t('loan.notInSearch')}
-        </Text>
-
         <View style={{ gap: spacing.md }}>
           <Button
             size="large"
-            label={owner ? t('loan.gotItBack') : t('loan.iReturnedIt')}
+            label={tx?.viewerRole === 'owner' ? t('transaction.returnedAllGood') : t('transaction.returnedYes')}
             loading={confirm.isPending}
             onPress={async () => {
               await confirm.mutateAsync(id);

@@ -13,7 +13,6 @@ import { useAuthGate } from '@/features/auth/useAuthGate';
 import { useLocation } from '@/features/location/useLocation';
 import { useUnreadCount } from '@/features/notifications/hooks';
 import { useSearchTools } from '@/features/tools/hooks';
-import { useToolLoans } from '@/features/transactions/hooks';
 import { chevronIcon } from '@/i18n/direction';
 import { formatRadius } from '@/lib/format';
 import { IS_DEMO } from '@/lib/config';
@@ -131,7 +130,6 @@ export default function Home() {
   const unread = useUnreadCount();
 
   const nearby = useSearchTools(centre, { ...DEFAULT_FILTERS, radiusM: RADIUS_M });
-  const loanFor = useToolLoans((nearby.data ?? []).map((tool) => tool.id));
 
   return (
     <Screen scroll testID="home-screen">
@@ -244,7 +242,6 @@ export default function Home() {
                 <ToolCard
                   key={tool.id}
                   tool={tool}
-                  loan={loanFor(tool.id)}
                   onPress={() => router.push(`/tool/${tool.id}`)}
                   onBorrow={() =>
                     requireMember(

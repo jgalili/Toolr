@@ -6,7 +6,6 @@ import { FlatList, View } from 'react-native';
 import { ToolCard } from '@/components/domain/ToolCard';
 import { Button, Chip, EmptyState, Screen, Skeleton, Text } from '@/components/primitives';
 import { useMyTools, useSetToolStatus } from '@/features/tools/hooks';
-import { useToolLoans } from '@/features/transactions/hooks';
 import { useTheme } from '@/theme';
 
 export default function MyTools() {
@@ -15,7 +14,6 @@ export default function MyTools() {
   const { spacing } = useTheme();
   const { data, isPending } = useMyTools();
   const setStatus = useSetToolStatus();
-  const loanFor = useToolLoans((data ?? []).map((tool) => tool.id));
 
   if (isPending) {
     return (
@@ -47,39 +45,21 @@ export default function MyTools() {
             primaryAction={{ label: t('home.haveTool'), onPress: () => router.push('/list/camera') }}
           />
         }
-        renderItem={({ item }) => {
-          // While a tool is physically out, "Available now" is a button that
-          // would lie: the listing comes back when the borrower does, and
-          // offering the switch here only invites someone to double-lend.
-          const out = item.status === 'borrowed';
-          return (
-            <View style={{ gap: spacing.xs }}>
-              <ToolCard
-                tool={item}
-                loan={loanFor(item.id)}
-                onPress={() => router.push(`/tool/${item.id}`)}
+        renderItem={({ item }) => (
+          <View style={{ gap: spacing.xs }}>
+            <ToolCard tool={item} onPress={() => router.push(`/tool/${item.id}`)} />
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Chip
+                label={t('listing.availableNow')}
+                onPress={() => setStatus.mutate({ id: item.id, status: 'active' })}
               />
-              {out ? (
-                <Text variant="caption" tone="muted">
-                  {t('loan.notInSearch')}
-                </Text>
-              ) : (
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Chip
-                    label={t('listing.availableNow')}
-                    selected={item.status === 'active'}
-                    onPress={() => setStatus.mutate({ id: item.id, status: 'active' })}
-                  />
-                  <Chip
-                    label={t('inbox.pending')}
-                    selected={item.status === 'paused'}
-                    onPress={() => setStatus.mutate({ id: item.id, status: 'paused' })}
-                  />
-                </View>
-              )}
+              <Chip
+                label={t('inbox.pending')}
+                onPress={() => setStatus.mutate({ id: item.id, status: 'paused' })}
+              />
             </View>
-          );
-        }}
+          </View>
+        )}
       />
       <View style={{ padding: spacing.lg }}>
         <Button label={t('home.haveTool')} onPress={() => router.push('/list/camera')} />
