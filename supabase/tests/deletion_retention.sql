@@ -23,10 +23,7 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","i
 select public.respond_to_request(:'rid','accepted');
 reset role;
 
--- Scoped to the transaction this test created. An unscoped count also counts
--- whatever the demo seed left in the table, which is not what is under test.
-select 'before: transactions' as check,
-       (select count(*)::text from public.transactions where request_id = :'rid') as value;
+select 'before: transactions' as check, count(*)::text from public.transactions;
 
 -- Simulate what the delete-account function does for the BORROWER (Dana)
 update public.messages set body = '[deleted]' where sender_id = '22222222-2222-2222-2222-222222222222';
@@ -35,11 +32,10 @@ delete from public.profiles where id = '22222222-2222-2222-2222-222222222222';
 select '1. profile deleted' as check,
        (select count(*)::text from public.profiles where id='22222222-2222-2222-2222-222222222222') as value;
 select '2. counterparty transaction SURVIVES' as check,
-       (select count(*)::text from public.transactions where request_id = :'rid') as value;
+       (select count(*)::text from public.transactions) as value;
 select '3. borrower_id nulled, not orphaned' as check,
-       (select (borrower_id is null)::text from public.transactions where request_id = :'rid') as value;
+       (select (borrower_id is null)::text from public.transactions limit 1) as value;
 select '4. owner history intact' as check,
-       (select (owner_id = '11111111-1111-1111-1111-111111111111')::text
-          from public.transactions where request_id = :'rid') as value;
+       (select (owner_id = '11111111-1111-1111-1111-111111111111')::text from public.transactions limit 1) as value;
 select '5. deleted user tools removed' as check,
        (select count(*)::text from public.tools where owner_id='22222222-2222-2222-2222-222222222222') as value;

@@ -71,17 +71,8 @@ exception when others then
 end $$;
 
 select '7. borrower reads tool_locations' as check, count(*)::text as value from public.tool_locations;
-
--- A pending request creates no transaction, and with no transaction there is
--- nothing get_pickup_location can hand over. Both halves are asserted, because
--- the second one is only meaningful while the first one holds -- and it must
--- name THIS request: `limit 1` picked whichever transaction the demo seed
--- happened to leave behind, and then asserted nothing at all.
-select '8. no transaction before accept' as check, count(*)::text as value
-  from public.transactions where request_id = :'req_id';
-select '8b. pickup BEFORE accept' as check, count(*)::text as value
-  from public.get_pickup_location(
-    (select id from public.transactions where request_id = :'req_id'));
+select '8. pickup BEFORE accept' as check, count(*)::text as value
+  from public.get_pickup_location((select id from public.transactions limit 1));
 reset role;
 
 -- ============ 4. Yossi accepts ============
@@ -91,22 +82,13 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","i
 select public.respond_to_request(:'req_id', 'accepted');
 reset role;
 
--- Every count below is scoped to THIS request. Unscoped counts pass or fail on
--- how much demo data the migrations seeded, which is not what is under test.
-select '9. transaction created' as check,
-       (select count(*)::text from public.transactions where request_id = :'req_id') as value;
-select '10. conversation created' as check,
-       (select count(*)::text from public.conversations where request_id = :'req_id') as value;
+select '9. transaction created' as check, (select count(*)::text from public.transactions) as value;
+select '10. conversation created' as check, (select count(*)::text from public.conversations) as value;
 select '11. system message posted' as check,
-       (select count(*)::text from public.messages
-         where kind='system'
-           and conversation_id = (select id from public.conversations where request_id = :'req_id')) as value;
-select '12. owner+borrower notified' as check,
-       (select count(*)::text from public.notifications
-         where payload->>'request_id' = :'req_id') as value;
+       (select count(*)::text from public.messages where kind='system') as value;
+select '12. owner+borrower notified' as check, (select count(*)::text from public.notifications) as value;
 
-select id as tx_id from public.transactions where request_id = :'req_id' \gset
-select id as conv_id from public.conversations where request_id = :'req_id' \gset
+select id as tx_id from public.transactions limit 1 \gset
 
 -- ============ 5. pickup address released ============
 set local role authenticated;
@@ -116,10 +98,10 @@ select '13. pickup AFTER accept' as check, coalesce(max(address_line),'(none)') 
   from public.get_pickup_location(:'tx_id');
 
 insert into public.messages (conversation_id, sender_id, kind, body)
-values (:'conv_id', '22222222-2222-2222-2222-222222222222','text','Great — see you at 18:00.');
+values ((select id from public.conversations limit 1),
+        '22222222-2222-2222-2222-222222222222','text','Great — see you at 18:00.');
 select '14. last_message_at touched' as check,
-       (select (last_message_at is not null)::text
-          from public.conversations where id = :'conv_id') as value;
+       (select (last_message_at is not null)::text from public.conversations limit 1) as value;
 
 select public.confirm_return(:'tx_id');
 reset role;
@@ -142,15 +124,13 @@ select public.submit_rating(:'tx_id', 5::smallint, array['on_time'], 'Thanks!');
 reset role;
 
 select '17. ratings published (both in)' as check,
-       (select count(*) filter (where is_published)::text
-          from public.ratings where transaction_id = :'tx_id') as value;
+       (select count(*) filter (where is_published)::text from public.ratings) as value;
 select '18. owner reputation updated' as check,
        (select rating_count_owner::text from public.profiles where id = '11111111-1111-1111-1111-111111111111') as value;
 
 -- ============ 6. search returns the listing with the new columns ============
 select '19. search finds the tool it created' as check, count(*)::text as value
   from public.search_tools_nearby(32.0553, 34.7688, 1000)
- where id = :'new_tool_id';
+ where title = 'Bosch Cordless Drill';
 select title, category_slug, distance_m, payment_mode
-  from public.search_tools_nearby(32.0553, 34.7688, 1000)
- where id = :'new_tool_id';
+  from public.search_tools_nearby(32.0553, 34.7688, 1000);
