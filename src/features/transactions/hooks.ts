@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { capture } from '@/lib/analytics';
 import { api } from '@/lib/api';
+import { currentLocale } from '@/i18n';
+
+import { loanLine, loansByTool, publicReservedLine, windowsByTool } from './loanState';
 
 export const txKeys = {
   incoming: ['requests', 'incoming'] as const,
@@ -9,6 +12,7 @@ export const txKeys = {
   transactions: ['transactions'] as const,
   transaction: (id: string) => ['transactions', id] as const,
   pickup: (id: string) => ['transactions', id, 'pickup'] as const,
+  reserved: (ids: string[]) => ['tools', 'reserved', [...ids].sort().join(',')] as const,
 };
 
 export function useIncomingRequests() {
@@ -45,6 +49,42 @@ export function usePickupLocation(transactionId: string | undefined, enabled: bo
     queryFn: () => api.getPickupLocation(transactionId!),
     staleTime: 5 * 60 * 1000,
   });
+}
+
+/**
+ * "What is happening with each of these tools?", answered for a whole list.
+ *
+ * Two sources, deliberately kept apart. Your OWN transactions say who has it
+ * and when it is due, because you are a party to them. For everyone else's
+ * tools the server will only tell you the DATES -- who borrowed the hedge
+ * trimmer is not public, but the fact that it is spoken for on Tuesday has to
+ * be, or people request days that were never available.
+ *
+ * Your own loan wins where both exist: "Lent to Dana - due 14 Sep" is strictly
+ * more useful to you than "Reserved 12-14 Sep".
+ */
+export function useToolLoans(toolIds: string[]) {
+  const { data: transactions } = useTransactions();
+
+  const mine = loansByTool(transactions ?? []);
+  const unknown = toolIds.filter((id) => !mine.has(id));
+
+  const { data: windows } = useQuery({
+    queryKey: txKeys.reserved(unknown),
+    enabled: unknown.length > 0,
+    staleTime: 60 * 1000,
+    queryFn: () => api.getReservedWindows(unknown),
+  });
+
+  const byTool = windowsByTool(windows ?? []);
+  const locale = currentLocale();
+
+  return (toolId: string) => {
+    const own = mine.get(toolId);
+    if (own) return loanLine(own, locale);
+    const forTool = byTool.get(toolId);
+    return forTool ? publicReservedLine(forTool, locale) : null;
+  };
 }
 
 export function useCreateBorrowRequest() {
@@ -87,6 +127,8 @@ export function useConfirmPickup() {
     onSuccess: () => {
       capture('pickup_confirmed');
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      // The listing has just left search, so anything showing tools is stale.
+      void queryClient.invalidateQueries({ queryKey: ['tools'] });
     },
   });
 }
@@ -98,6 +140,7 @@ export function useConfirmReturn() {
     onSuccess: () => {
       capture('return_confirmed');
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      void queryClient.invalidateQueries({ queryKey: ['tools'] });
     },
   });
 }

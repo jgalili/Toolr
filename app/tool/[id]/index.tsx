@@ -8,12 +8,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/domain/AppHeader';
 import { Icon, type IconName } from '@/components/domain/Icon';
 import { OwnerCard } from '@/components/domain/OwnerCard';
-import { PriceLabel, RatingPill } from '@/components/domain/ToolCard';
+import { LoanBadge, PriceLabel, RatingPill } from '@/components/domain/ToolCard';
 import { SafetyNote } from '@/components/domain/SafetyNote';
 import { ToolIllustration } from '@/components/domain/ToolIllustration';
 import { Button, Chip, ErrorState, Screen, Skeleton, Text } from '@/components/primitives';
 import { useAuthGate } from '@/features/auth/useAuthGate';
 import { useTool, useToggleFavorite } from '@/features/tools/hooks';
+import { useToolLoans } from '@/features/transactions/hooks';
 import { backIcon } from '@/i18n/direction';
 import { formatDistance } from '@/lib/format';
 import { useTheme } from '@/theme';
@@ -141,6 +142,7 @@ export default function ToolDetail() {
   const toggleFavorite = useToggleFavorite();
 
   const { data: tool, isPending, error, refetch } = useTool(id);
+  const loanFor = useToolLoans(id ? [id] : []);
 
   if (isPending) {
     return (
@@ -169,6 +171,7 @@ export default function ToolDetail() {
 
   const canBorrow = tool.status === 'active';
   const today = todaysWindows(tool.pickupWindows);
+  const loan = loanFor(tool.id);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -309,6 +312,10 @@ export default function ToolDetail() {
               <Text variant="body">{tool.instructions}</Text>
             </Panel>
           ) : null}
+
+          {/* Which days are already taken. Shown next to the borrow window so
+              nobody picks Tuesday and waits two days to be told it was gone. */}
+          {loan ? <LoanBadge line={loan} /> : null}
 
           {tool.maxBorrowDays ? (
             <Text variant="caption" tone="muted">

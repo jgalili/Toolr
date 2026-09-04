@@ -108,6 +108,14 @@ select '12. owner+borrower notified' as check,
 select id as tx_id from public.transactions where request_id = :'req_id' \gset
 select id as conv_id from public.conversations where request_id = :'req_id' \gset
 
+-- ============ 4b. a reservation does not take the tool off the map ============
+-- Accepting for next Tuesday must not hide a drill for a week. It is spoken
+-- for on those dates and still borrowable in the meantime.
+select '20. RESERVED tool still listed' as check, count(*)::text as value
+  from public.search_tools_nearby(32.0553, 34.7688, 1000) where id = :'new_tool_id';
+select '21. reserved window is public' as check, count(*)::text as value
+  from public.reserved_windows(array[:'new_tool_id']::uuid[]) where is_out = false;
+
 -- ============ 5. pickup address released ============
 set local role authenticated;
 set local request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
@@ -121,13 +129,40 @@ select '14. last_message_at touched' as check,
        (select (last_message_at is not null)::text
           from public.conversations where id = :'conv_id') as value;
 
-select public.confirm_return(:'tx_id');
+-- ============ 5b. it changes hands ============
+select public.confirm_pickup(:'tx_id');
+select '22. status after pickup' as check,
+       (select status::text from public.transactions where id = :'tx_id') as value;
 reset role;
 
+-- Gone from the neighbourhood, so gone from search.
+select '23. BORROWED tool is delisted' as check, count(*)::text as value
+  from public.search_tools_nearby(32.0553, 34.7688, 1000) where id = :'new_tool_id';
+select '24. listing marked borrowed' as check,
+       (select status::text from public.tools where id = :'new_tool_id') as value;
+
+-- ============ 6. the borrower says they gave it back ============
+-- A claim, not a fact: the tool stays delisted until the owner agrees.
+set local role authenticated;
+set local request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","is_anonymous":false}';
+select public.confirm_return(:'tx_id');
+reset role;
+select '25. STILL delisted on borrower say-so' as check, count(*)::text as value
+  from public.search_tools_nearby(32.0553, 34.7688, 1000) where id = :'new_tool_id';
+
+-- ============ 7. the owner confirms, and only now is it available ============
 set local role authenticated;
 set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","is_anonymous":false}';
 select public.confirm_return(:'tx_id');
+reset role;
+select '26. RELISTED after owner confirms' as check, count(*)::text as value
+  from public.search_tools_nearby(32.0553, 34.7688, 1000) where id = :'new_tool_id';
+
+set local role authenticated;
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","is_anonymous":false}';
 select '15. transaction completed' as check,
        (select status::text from public.transactions where id = :'tx_id') as value;
 select '16. owner completed_lends' as check,

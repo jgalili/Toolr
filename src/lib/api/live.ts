@@ -31,6 +31,7 @@ import type {
   PickupLocation,
   PublicProfile,
   Rating,
+  ReservedWindow,
   ToolDetail,
   ToolRequest,
   ToolSummary,
@@ -238,24 +239,7 @@ export const liveSource: DataSource = {
   },
 
   async getProfileTools(id) {
-    const supabase = requireSupabase();
-    const { data, error } = await supabase
-      .from('tools')
-      .select('*, tool_categories(slug), tool_photos(storage_path, position)')
-      .eq('owner_id', id)
-      .eq('status', 'active')
-      .is('deleted_at', null);
-    if (error) throw error;
-    return (data ?? []).map((row: any) => ({
-      ...mapSearchRow({
-        ...row,
-        category_slug: row.tool_categories?.slug,
-        distance_m: 0,
-        lat: 0,
-        lng: 0,
-        primary_photo: row.tool_photos?.[0]?.storage_path ?? null,
-      }),
-    }));
+    return ownerTools(id, ['active']);
   },
 
   async getRatingsFor(userId) {
@@ -284,10 +268,13 @@ export const liveSource: DataSource = {
     );
   },
 
+  // Your own shelf shows everything you own that still exists -- a drill that
+  // is out on loan is the row you most want to see, and filtering to 'active'
+  // made it vanish from My Tools at exactly the moment it mattered.
   async getMyTools() {
     const userId = await currentUserId();
     if (!userId) return [];
-    return liveSource.getProfileTools(userId);
+    return ownerTools(userId, ['active', 'paused', 'borrowed', 'draft']);
   },
 
   async createTool(input: ListingInput, photoUri) {
@@ -450,6 +437,7 @@ export const liveSource: DataSource = {
       .from('transactions')
       .select(
         `*, tools(title, tool_photos(storage_path, position)),
+         borrow_requests(start_at),
          owner:profiles!transactions_owner_id_fkey(id, first_name, avatar_url, rating_sum_owner, rating_count_owner),
          borrower:profiles!transactions_borrower_id_fkey(id, first_name, avatar_url, rating_sum_borrower, rating_count_borrower),
          conversations(id), ratings(rater_id)`,
@@ -480,13 +468,27 @@ export const liveSource: DataSource = {
     };
   },
 
+  // An RPC, not an UPDATE. The direct write only worked because the table's
+  // update policy let either party set any column -- including status and
+  // due_at -- and now that a listing's availability follows its loan, that
+  // would have let a borrower put someone else's drill back into search.
   async confirmPickup(transactionId) {
     const supabase = requireSupabase();
-    const { error } = await supabase
-      .from('transactions')
-      .update({ status: 'picked_up', picked_up_at: new Date().toISOString() })
-      .eq('id', transactionId);
+    const { error } = await supabase.rpc('confirm_pickup', { p_transaction_id: transactionId });
     if (error) throw error;
+  },
+
+  async getReservedWindows(toolIds): Promise<ReservedWindow[]> {
+    if (toolIds.length === 0) return [];
+    const supabase = requireSupabase();
+    const { data, error } = await supabase.rpc('reserved_windows', { p_tool_ids: toolIds });
+    if (error) throw error;
+    return (data ?? []).map((row: any) => ({
+      toolId: row.tool_id,
+      startAt: row.start_at,
+      endAt: row.end_at,
+      isOut: Boolean(row.is_out),
+    }));
   },
 
   async confirmReturn(transactionId) {
@@ -890,6 +892,28 @@ function smoothed(sum?: number, count?: number): number | null {
   return Number((((sum ?? 0) + 4.6 * 5) / (count + 5)).toFixed(2));
 }
 
+async function ownerTools(ownerId: string, statuses: string[]): Promise<ToolSummary[]> {
+  const supabase = requireSupabase();
+  const { data, error } = await supabase
+    .from('tools')
+    .select('*, tool_categories(slug), tool_photos(storage_path, position)')
+    .eq('owner_id', ownerId)
+    .in('status', statuses)
+    .is('deleted_at', null);
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    ...mapSearchRow({
+      ...row,
+      category_slug: row.tool_categories?.slug,
+      distance_m: 0,
+      lat: 0,
+      lng: 0,
+      primary_photo: row.tool_photos?.[0]?.storage_path ?? null,
+    }),
+    status: row.status,
+  }));
+}
+
 function mapTransaction(row: any, userId: string): Transaction {
   const isOwner = row.owner_id === userId;
   const other = isOwner ? row.borrower : row.owner;
@@ -913,9 +937,11 @@ function mapTransaction(row: any, userId: string): Transaction {
     status: row.status,
     agreedTotalAgorot: row.agreed_total_agorot,
     currency: row.currency ?? 'ILS',
+    startAt: row.borrow_requests?.start_at ?? null,
     dueAt: row.due_at,
     pickedUpAt: row.picked_up_at,
     returnedAt: row.returned_at,
+    ownerConfirmedReturn: row.owner_confirmed_return_at != null,
     completedAt: row.completed_at,
     conversationId: row.conversations?.[0]?.id ?? null,
     hasRated: (row.ratings ?? []).some((r: any) => r.rater_id === userId),

@@ -160,3 +160,38 @@ export function formatRelativeDay(
     return iso.slice(0, 10);
   }
 }
+
+/** "14 Sep" — the shortest form that is still unambiguous on a crowded card. */
+export function formatShortDate(iso: string, locale: Locale = 'en'): string {
+  try {
+    return new Intl.DateTimeFormat(locale === 'he' ? 'he-IL' : 'en-GB', {
+      day: 'numeric',
+      month: 'short',
+    }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+/**
+ * "12–14 Sep", collapsing the month when both ends share it.
+ *
+ * Repeating "Sep" twice inside six characters reads as noise, and the range is
+ * the point: someone scanning a card wants to know whether their Tuesday is
+ * free, not to parse two full dates.
+ */
+export function formatDateRange(fromIso: string, toIso: string, locale: Locale = 'en'): string {
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return formatShortDate(toIso, locale);
+  }
+  const sameMonth = from.getMonth() === to.getMonth() && from.getFullYear() === to.getFullYear();
+  if (!sameMonth) return `${formatShortDate(fromIso, locale)} – ${formatShortDate(toIso, locale)}`;
+  const day = new Intl.DateTimeFormat(locale === 'he' ? 'he-IL' : 'en-GB', {
+    day: 'numeric',
+  }).format(from);
+  return from.getDate() === to.getDate()
+    ? formatShortDate(toIso, locale)
+    : `${day}–${formatShortDate(toIso, locale)}`;
+}

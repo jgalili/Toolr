@@ -341,7 +341,8 @@
       "accepted": "אושר",
       "pickedUp": "נאסף",
       "returned": "הוחזר",
-      "rated": "דורג"
+      "rated": "דורג",
+      "reserved": "משוריין"
     },
     "pickupTitle": "פרטי איסוף",
     "pickupUnlocked": "{{name}} שיתף איתכם את הכתובת.",
@@ -535,5 +536,24 @@
     "lendingOverdueTitle": "עוד לא חזר",
     "lendingOverdueBody": "ה{{tool}} שלכם עדיין אצל {{name}}. הוא היה אמור לחזור אתמול.",
     "remindersOn": "נזכיר לכם לפני מועד ההחזרה."
+  },
+  "loan": {
+    "reserved": "משוריין",
+    "borrowed": "מושאל",
+    "ownerReserved": "משוריין ל{{name}} · {{when}}",
+    "ownerLent": "הושאל ל{{name}} · להחזרה {{when}}",
+    "ownerOverdue": "{{name}} עדיין מחזיק · היה אמור לחזור {{when}}",
+    "ownerAwaitingConfirm": "{{name}} מסר שהוחזר · אשרו",
+    "borrowerReserved": "משוריין מ{{name}} · {{when}}",
+    "borrowerHas": "מושאל מ{{name}} · להחזרה {{when}}",
+    "borrowerOverdue": "באיחור · היה אמור לחזור {{when}}",
+    "borrowerReturned": "הוחזר · ממתין לאישור של {{name}}",
+    "publicReserved": "משוריין {{when}}",
+    "handedOver": "מסרתי את הכלי",
+    "iReturnedIt": "החזרתי",
+    "gotItBack": "קיבלתי בחזרה",
+    "outOnLoan": "מושאל כרגע",
+    "backInSearch": "חזר לתוצאות החיפוש של השכנים.",
+    "notInSearch": "מוסתר מהחיפוש עד שתאשרו שחזר."
   }
 }

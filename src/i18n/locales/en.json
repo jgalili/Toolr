@@ -341,7 +341,8 @@
       "accepted": "Accepted",
       "pickedUp": "Picked up",
       "returned": "Returned",
-      "rated": "Rated"
+      "rated": "Rated",
+      "reserved": "Reserved"
     },
     "pickupTitle": "Pickup details",
     "pickupUnlocked": "{{name}} shared the address with you.",
@@ -535,5 +536,24 @@
     "lendingOverdueTitle": "Not back yet",
     "lendingOverdueBody": "{{name}} still has your {{tool}}. It was due yesterday.",
     "remindersOn": "You'll be reminded before it's due back."
+  },
+  "loan": {
+    "reserved": "Reserved",
+    "borrowed": "Borrowed",
+    "ownerReserved": "Reserved for {{name}} · {{when}}",
+    "ownerLent": "Lent to {{name}} · due {{when}}",
+    "ownerOverdue": "{{name}} still has it · was due {{when}}",
+    "ownerAwaitingConfirm": "{{name}} says it's back · confirm",
+    "borrowerReserved": "Reserved from {{name}} · {{when}}",
+    "borrowerHas": "Borrowed from {{name}} · back {{when}}",
+    "borrowerOverdue": "Overdue · was due back {{when}}",
+    "borrowerReturned": "Returned · waiting for {{name}} to confirm",
+    "publicReserved": "Reserved {{when}}",
+    "handedOver": "I handed it over",
+    "iReturnedIt": "I returned it",
+    "gotItBack": "Got it back",
+    "outOnLoan": "Out on loan",
+    "backInSearch": "Back in your neighbours' search results.",
+    "notInSearch": "Hidden from search until you confirm it's back."
   }
 }
