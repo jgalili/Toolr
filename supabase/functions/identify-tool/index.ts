@@ -2,7 +2,7 @@ import { z } from 'npm:zod@3';
 
 import { adminClient, requireCaller, userClient } from '../_shared/auth.ts';
 import { json, preflight } from '../_shared/cors.ts';
-import { generateJson } from '../_shared/gemini.ts';
+import { MODEL, generateJson } from '../_shared/gemini.ts';
 import { IDENTIFICATION_RESPONSE_SCHEMA, IDENTIFY_SYSTEM_PROMPT } from '../_shared/schema.ts';
 
 const PROMPT_VERSION = 'identify-v1';
@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
     .insert({
       user_id: caller.id,
       image_path: path,
-      model_name: Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash-lite',
+      model_name: MODEL,
       prompt_version: PROMPT_VERSION,
       raw_response: raw as Record<string, unknown>,
       parsed: identification,

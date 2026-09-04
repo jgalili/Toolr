@@ -6,7 +6,17 @@
  * but we still validate what comes back with Zod, because a constrained
  * decoder is a strong hint, not a guarantee.
  */
-const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash-lite';
+/**
+ * The model, overridable without a redeploy via the GEMINI_MODEL secret.
+ *
+ * That override is not a nicety. The previous default, gemini-2.5-flash-lite,
+ * stopped existing for this project and every call came back 404 in about 50ms
+ * -- too fast to be inference, and indistinguishable from "the AI is broken"
+ * from inside the app, because the only thing the client ever sees is
+ * `model_failed`. Model names are the part of this integration most likely to
+ * rot, so keep the fallback current AND keep it overridable.
+ */
+export const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 export type GeminiPart =
