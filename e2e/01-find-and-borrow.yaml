@@ -1,0 +1,56 @@
+# Journey 1: a guest finds a tool by describing the job, and hits the auth wall.
+#
+# The product's whole premise is in this flow. If it breaks, nothing else
+# matters.
+appId: app.nailedit.android
+name: Find a tool and hit the auth wall
+---
+- launchApp:
+    clearState: true
+
+# Onboarding is skippable — a person who already knows what this is should not
+# be made to read three screens.
+- assertVisible: "Why buy something you'll use once?"
+- tapOn: "Skip"
+
+# Home: two decisions, nothing else.
+- assertVisible: "I need a tool"
+- assertVisible: "I have a tool"
+- tapOn:
+    id: "home-need-tool"
+
+# Natural language, not a keyword. This is the thing that makes the app feel
+# like it understands you.
+- tapOn: "I need to make a hole in a concrete wall"
+
+# The interpretation must be VISIBLE and REVERSIBLE. Silently rewriting
+# someone's query is the fastest way to make search feel broken.
+- assertVisible:
+    text: "Showing hammer drills and rotary hammers.*"
+- assertVisible: "Search the exact words instead"
+
+# Distance and price are the two facts a borrower actually decides on.
+- assertVisible:
+    text: ".*m away.*"
+- assertVisible: "FREE"
+
+- tapOn:
+    text: "Bosch Cordless Drill"
+
+# Tool detail: the location is an AREA, never a pin.
+- assertVisible: "Approximate area"
+- assertVisible: "Borrow"
+
+- tapOn:
+    id: "borrow-button"
+
+# THE ASSERTION THAT MATTERS: a guest gets a sheet that names the action, and
+# can dismiss it back to exactly where they were. Not a full-screen signup gate.
+- assertVisible:
+    text: "Sign in to ask Yossi for the Bosch Cordless Drill"
+- assertVisible: "Keep browsing"
+- tapOn: "Keep browsing"
+
+# Dismissing left them a guest, on the same tool, with nothing lost.
+- assertVisible: "Bosch Cordless Drill"
+- assertVisible: "Borrow"

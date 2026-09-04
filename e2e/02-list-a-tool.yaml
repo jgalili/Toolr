@@ -1,0 +1,66 @@
+# Journey 2: the 30-second listing — with the AI unable to be certain.
+#
+# Demo mode deliberately returns the MEDIUM confidence tier, so this exercises
+# the "which looks closest?" path and the generic fallback: the route a real
+# user takes when the model is wrong. A listing flow that only works when the
+# AI is right is a dependency, not a shortcut.
+appId: app.nailedit.android
+name: List a tool when the AI is unsure
+---
+- launchApp:
+    clearState: true
+- tapOn: "Skip"
+
+- tapOn:
+    id: "home-have-tool"
+
+# Guests cannot list. One tap through the sheet, then straight back to the
+# action they were taking.
+- runFlow:
+    when:
+      visible: "Continue with Google"
+    commands:
+      - tapOn: "Continue with Google"
+
+# The camera opens immediately. No form first — that is most of what makes
+# thirty seconds achievable.
+- assertVisible: "Point at the tool"
+
+# On an emulator without a usable camera, take the gallery route.
+- runFlow:
+    when:
+      visible: "Choose from gallery"
+    commands:
+      - tapOn: "Choose from gallery"
+      - tapOn:
+          point: "50%,50%"
+
+- assertVisible: "Looking at your tool…"
+
+# Medium confidence: a short list, each labelled honestly.
+- assertVisible: "Which looks closest?"
+- assertVisible: "Possible match"
+
+# The generic option must be on EVERY variant. It is often the honest answer
+# and always the fastest.
+- assertVisible:
+    text: "Just call it a.*"
+- tapOn:
+    text: "Just call it a.*"
+
+# The only required screen: two decisions, then list it.
+- assertVisible: "How do you want to lend it?"
+- tapOn: "Free"
+- assertVisible: "When is it available?"
+- tapOn: "Available now"
+
+# The privacy promise is stated where the person is making the decision, not
+# buried in a policy.
+- assertVisible:
+    text: "Neighbours only ever see an approximate area.*"
+
+- tapOn:
+    id: "list-tool"
+
+- assertVisible:
+    text: ".*is live.*"

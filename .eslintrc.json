@@ -1,0 +1,11 @@
+{
+  "extends": "expo",
+  "ignorePatterns": ["dist/*", "node_modules/*", "supabase/functions/*"],
+  "rules": {
+    "import/order": ["warn", {
+      "groups": ["builtin", "external", "internal", "parent", "sibling"],
+      "newlines-between": "always",
+      "alphabetize": { "order": "asc", "caseInsensitive": true }
+    }]
+  }
+}

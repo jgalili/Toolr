@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  app:
+    name: Typecheck & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  database:
+    name: Schema & security assertions
+    runs-on: ubuntu-latest
+    # These are the tests that stop a future migration from quietly publishing
+    # everyone's home address, or letting a guest borrow. They are not optional.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: toolr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      PGPASSWORD: postgres
+      PSQL: psql -h localhost -U postgres -d toolr_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply migrations
+        run: |
+          set -e
+          $PSQL -v ON_ERROR_STOP=1 -f supabase/tests/_local_auth_stub.sql
+          for f in supabase/migrations/*.sql; do
+            case "$f" in
+              *storage*) echo "skip $f (needs the Supabase storage schema)"; continue ;;
+            esac
+            echo "applying $f"
+            $PSQL -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Guest boundary
+        run: $PSQL -1 -f supabase/tests/guest_boundary.sql | tee /tmp/guest.txt
+
+      - name: Transaction loop
+        run: |
+          $PSQL -c 'drop schema public cascade; create schema public;' >/dev/null
+          $PSQL -c 'drop schema auth cascade;' >/dev/null
+          $PSQL -v ON_ERROR_STOP=1 -f supabase/tests/_local_auth_stub.sql
+          for f in supabase/migrations/*.sql; do
+            case "$f" in *storage*) continue ;; esac
+            $PSQL -v ON_ERROR_STOP=1 -f "$f"
+          done
+          $PSQL -1 -f supabase/tests/transaction_loop.sql | tee /tmp/loop.txt
+
+      - name: Deletion retention
+        run: $PSQL -1 -f supabase/tests/deletion_retention.sql | tee /tmp/delete.txt
+
+      - name: Assert the security guarantees held
+        run: |
+          set -e
+          grep -q "guest CANNOT borrow ............ PASS" /tmp/loop.txt
+          grep -q "guest CANNOT borrow ........ PASS"     /tmp/guest.txt
+          # A non-owner must read zero rows from tool_locations.
+          grep -qE "borrower reads tool_locations *\| *0" /tmp/loop.txt
+          grep -qE "pickup BEFORE accept *\| *0"          /tmp/loop.txt
+          # A duplicate pending request must be refused. This one silently
+          # stopped asserting once seed data existed — it now pins the tool id.
+          grep -q "duplicate request blocked ...... PASS" /tmp/loop.txt
+          # Deleting an account must not destroy the counterparty's record.
+          grep -qE "counterparty transaction SURVIVES *\| *1" /tmp/delete.txt
+          echo "Security assertions held."

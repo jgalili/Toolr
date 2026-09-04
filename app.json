@@ -1,0 +1,90 @@
+{
+  "expo": {
+    "name": "NailedIt",
+    "slug": "nailedit",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "nailedit",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "platforms": [
+      "android",
+      "ios",
+      "web"
+    ],
+    "android": {
+      "package": "app.nailedit.android",
+      "adaptiveIcon": {
+        "backgroundColor": "#00A0AE"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS",
+        "INTERNET"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "SET_VIA_EAS_SECRET_GOOGLE_MAPS_ANDROID_KEY"
+        }
+      }
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.nailedit.ios"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "NailedIt uses your approximate location to show tools available near you. We never show your exact address to anyone."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "NailedIt uses the camera so you can photograph a tool and have it identified for you."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NailedIt needs access to your photos so you can choose a picture of your tool."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F8FA",
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.REPLACE_WITH_YOUR_IOS_CLIENT_ID"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {}
+    }
+  }
+}

@@ -1,0 +1,56 @@
+# Journey 3: the trust loop — pickup, return, two-sided rating.
+#
+# Demo mode ships one accepted transaction so this can run without a backend.
+appId: app.nailedit.android
+name: Pickup, return and rate
+---
+- launchApp:
+    clearState: true
+- tapOn: "Skip"
+
+- tapOn: "Inbox"
+
+- runFlow:
+    when:
+      visible: "Continue with Google"
+    commands:
+      - tapOn: "Continue with Google"
+
+- tapOn: "Chats"
+- tapOn: "Yossi"
+
+# Chat is scoped to the transaction, and says plainly that a phone number is
+# never shared automatically.
+- assertVisible: "NailedIt never shares your phone number."
+- assertVisible: "Yes, it's available."
+
+- tapOn: "Borrowing"
+
+# THE ASSERTION THAT MATTERS: the exact address exists on exactly one screen,
+# and only because this transaction was accepted.
+- tapOn: "Pickup details"
+- assertVisible:
+    text: ".*shared the address with you.*"
+- assertVisible: "Vital St 12, apartment 4, Tel Aviv"
+- assertVisible: "Open in Maps"
+- back
+
+- tapOn: "I picked it up"
+- tapOn: "Returned"
+- assertVisible:
+    text: "Did you return the.*"
+- tapOn: "Yes, returned"
+
+# Rating: stars plus tag chips, never an essay.
+- assertVisible:
+    text: "How was borrowing from Yossi.*"
+- tapOn:
+    text: "5 stars"
+- tapOn: "Tool as described"
+
+# Double-blind. Saying so up front is what stops it feeling broken when the
+# rating does not appear immediately.
+- assertVisible:
+    text: "Your rating appears once you've both rated.*"
+
+- tapOn: "Submit rating"

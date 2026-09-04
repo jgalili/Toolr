@@ -1,0 +1,22 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+.env
+.env.local
+.DS_Store
+android/
+ios/
+supabase/.temp/
+coverage/
+
+# Not for a public repository.
+# "Claude outputs" holds working screenshots and zips; _superseded holds
+# migrations that have been replaced. Neither belongs in the history, and on a
+# public repo neither belongs in view.
+Claude outputs/
+_superseded/
+*.apk
+*.aab
+*.keystore

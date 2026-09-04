@@ -1,0 +1,1341 @@
+<title>Toolr Architecture Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* ============================================================
+   Toolr — planning document
+   Palette: pine green accent, green-biased neutrals, hardware
+   amber reserved strictly for risk/warning semantics.
+   Type: Bricolage Grotesque (display) / Newsreader (prose) /
+   IBM Plex Mono (labels, data, code).
+   ============================================================ */
+
+:root {
+  --paper:        #F5F7F2;
+  --surface:      #FFFFFF;
+  --surface-2:    #ECEFE7;
+  --ink:          #191D18;
+  --ink-2:        #414A3F;
+  --muted:        #6E766B;
+  --line:         #D8DED2;
+  --line-strong:  #B7C0AE;
+
+  --accent:       #2C6A4C;
+  --accent-ink:   #1E4B36;
+  --accent-soft:  #DEEADF;
+
+  --amber:        #A96A0C;
+  --amber-soft:   #F5E7CF;
+  --danger:       #9A3521;
+  --danger-soft:  #F3DED8;
+
+  --shadow: 0 1px 2px rgba(25,29,24,.05), 0 8px 24px -16px rgba(25,29,24,.28);
+
+  --measure: 68ch;
+  --radius: 4px;
+  --radius-lg: 10px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:       #121510;
+    --surface:     #1A1E18;
+    --surface-2:   #232820;
+    --ink:         #E6EAE1;
+    --ink-2:       #BCC4B7;
+    --muted:       #8B9486;
+    --line:        #2E3429;
+    --line-strong: #444C3E;
+
+    --accent:      #74C295;
+    --accent-ink:  #A6DCBB;
+    --accent-soft: #1E3327;
+
+    --amber:       #E3A84F;
+    --amber-soft:  #382C15;
+    --danger:      #E0836A;
+    --danger-soft: #3A211A;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:       #121510;
+  --surface:     #1A1E18;
+  --surface-2:   #232820;
+  --ink:         #E6EAE1;
+  --ink-2:       #BCC4B7;
+  --muted:       #8B9486;
+  --line:        #2E3429;
+  --line-strong: #444C3E;
+
+  --accent:      #74C295;
+  --accent-ink:  #A6DCBB;
+  --accent-soft: #1E3327;
+
+  --amber:       #E3A84F;
+  --amber-soft:  #382C15;
+  --danger:      #E0836A;
+  --danger-soft: #3A211A;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: 17.5px;
+  line-height: 1.62;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  margin: 0;
+  color: var(--ink);
+}
+
+.mono, code, kbd, .eyebrow, th, .chip, .tag, .num {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+/* ---------- shell ---------- */
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 28px 96px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 0; }
+  .toc { display: none; }
+  .wrap { padding: 0 20px 72px; }
+}
+
+.toc {
+  position: sticky;
+  top: 28px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  border-inline-start: 2px solid var(--line);
+  padding-inline-start: 14px;
+}
+.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.toc a { color: var(--muted); text-decoration: none; display: block; }
+.toc a:hover { color: var(--accent-ink); }
+.toc .toc-n { color: var(--line-strong); margin-inline-end: 7px; }
+.toc-head {
+  text-transform: uppercase; letter-spacing: .12em; font-size: 10px;
+  color: var(--line-strong); margin-bottom: 14px;
+}
+
+/* ---------- hero ---------- */
+
+.hero { padding: 76px 0 12px; }
+
+.brandline {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+.wordmark {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 700; font-size: 21px; letter-spacing: -0.03em;
+  color: var(--accent-ink);
+}
+.brandline .eyebrow {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted);
+}
+
+.hero h1 {
+  font-size: clamp(38px, 6.4vw, 66px);
+  line-height: 1.03;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  max-width: 16ch;
+}
+.hero .thesis {
+  margin: 26px 0 0;
+  font-size: 21px;
+  line-height: 1.5;
+  max-width: 60ch;
+  color: var(--ink-2);
+}
+.hero .thesis em { font-style: italic; color: var(--ink); }
+
+.status {
+  margin-top: 34px;
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-radius: 999px;
+  padding: 7px 15px 7px 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+}
+.status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+
+/* ---------- decision strip ---------- */
+
+.strip {
+  margin: 46px 0 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* 1px gap over a line-coloured ground draws the dividers, so a wrapped
+     row never leaves a dangling border the way per-cell borders would. */
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.strip div {
+  padding: 20px 20px 20px 0;
+  background: var(--paper);
+}
+@media (max-width: 1000px) { .strip { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 560px)  { .strip { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.strip div + div { padding-inline-start: 20px; }
+.strip dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--muted); margin-bottom: 8px;
+}
+.strip dd {
+  margin: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 600; font-size: 19px; letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.strip dd span { display: block; font-family: "Newsreader", serif; font-weight: 400; font-size: 14px; color: var(--muted); margin-top: 5px; letter-spacing: 0; }
+
+/* ---------- sections ---------- */
+
+section { padding-top: 76px; scroll-margin-top: 20px; }
+
+.sec-head {
+  display: flex; align-items: baseline; gap: 16px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 12px; margin-bottom: 30px;
+}
+.sec-head .n {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  letter-spacing: .06em;
+}
+.sec-head h2 { font-size: clamp(24px, 3.4vw, 33px); letter-spacing: -0.028em; }
+
+h3 {
+  font-size: 20px; margin: 44px 0 12px; letter-spacing: -0.02em;
+}
+h3:first-of-type { margin-top: 0; }
+h4 {
+  font-size: 13px; font-family: "IBM Plex Mono", monospace; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
+  margin: 28px 0 10px;
+}
+
+p { margin: 0 0 16px; max-width: var(--measure); }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; }
+
+ul, ol { max-width: var(--measure); padding-inline-start: 22px; margin: 0 0 18px; }
+li { margin-bottom: 7px; }
+li::marker { color: var(--line-strong); }
+
+strong { font-weight: 600; }
+code {
+  font-size: .86em;
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ---------- tables ---------- */
+
+.tablewrap { overflow-x: auto; margin: 0 0 24px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th {
+  text-align: start; font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
+  padding: 0 16px 9px 0; border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+td {
+  padding: 11px 16px 11px 0; border-bottom: 1px solid var(--line);
+  vertical-align: top; line-height: 1.45;
+}
+td:last-child, th:last-child { padding-inline-end: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- chips ---------- */
+
+.chip {
+  display: inline-block; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 3px 8px; border-radius: 3px; white-space: nowrap;
+  background: var(--surface-2); color: var(--ink-2);
+}
+.chip.ok    { background: var(--accent-soft); color: var(--accent-ink); }
+.chip.warn  { background: var(--amber-soft);  color: var(--amber); }
+.chip.crit  { background: var(--danger-soft); color: var(--danger); }
+
+/* ---------- decision cards ---------- */
+
+.decisions { display: flex; flex-direction: column; gap: 0; margin-bottom: 8px; }
+.decision {
+  display: grid;
+  grid-template-columns: 152px minmax(0,1fr);
+  gap: 28px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+.decision:first-child { border-top: 1px solid var(--line); }
+@media (max-width: 700px) { .decision { grid-template-columns: 1fr; gap: 10px; } }
+.decision .role {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+  text-transform: uppercase; letter-spacing: .11em; color: var(--muted);
+  padding-top: 5px;
+}
+.decision .pick {
+  font-family: "Bricolage Grotesque", sans-serif; font-weight: 600;
+  font-size: 21px; letter-spacing: -0.022em; margin-bottom: 8px;
+  color: var(--accent-ink);
+}
+.decision p { margin: 0 0 8px; font-size: 16px; }
+.decision .rejected {
+  font-size: 14.5px; color: var(--muted);
+}
+.decision .rejected b { font-family: "IBM Plex Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--line-strong); margin-inline-end: 6px; }
+
+/* ---------- callout ---------- */
+
+.callout {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 26px 0;
+  max-width: var(--measure);
+}
+.callout.warn { border-inline-start-color: var(--amber); }
+.callout p:last-child { margin-bottom: 0; }
+.callout .k {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
+  display: block; margin-bottom: 8px;
+}
+
+/* ---------- panels / figures ---------- */
+
+.figure {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  margin: 28px 0;
+  box-shadow: var(--shadow);
+}
+.figure figcaption {
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+  color: var(--muted); margin-top: 18px; line-height: 1.5;
+}
+.figure svg { display: block; width: 100%; height: auto; }
+
+pre {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px; line-height: 1.62;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  overflow-x: auto;
+  margin: 0 0 24px;
+  color: var(--ink-2);
+}
+pre b { color: var(--accent-ink); font-weight: 600; }
+pre .c { color: var(--muted); }
+
+/* ---------- scope split ---------- */
+
+.scope { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 26px 0; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+@media (max-width: 760px) { .scope { grid-template-columns: 1fr; } }
+.scope > div { padding: 22px 24px; background: var(--surface); }
+.scope > div + div { border-inline-start: 1px solid var(--line); background: var(--surface-2); }
+@media (max-width: 760px) { .scope > div + div { border-inline-start: 0; border-top: 1px solid var(--line); } }
+.scope h4 { margin-top: 0; }
+.scope ul { padding-inline-start: 0; list-style: none; font-size: 15px; }
+.scope li { margin-bottom: 6px; display: flex; gap: 9px; align-items: baseline; }
+.scope li .m { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--accent); flex: none; }
+.scope > div + div li .m { color: var(--line-strong); }
+
+/* ---------- confidence ladder ---------- */
+
+.ladder { display: flex; flex-direction: column; gap: 12px; margin: 26px 0; }
+.rung {
+  display: grid; grid-template-columns: 118px minmax(0,1fr);
+  gap: 22px; align-items: start;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 18px 22px;
+}
+@media (max-width: 700px) { .rung { grid-template-columns: 1fr; gap: 8px; } }
+.rung .tier {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em;
+}
+.rung .tier span { display: block; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); margin-top: 4px; font-size: 11px; }
+.rung .say { font-size: 17px; margin-bottom: 6px; }
+.rung .say b { color: var(--accent-ink); font-weight: 600; }
+.rung .do { font-size: 14.5px; color: var(--muted); margin: 0; }
+.rung.t-high .tier { color: var(--accent); }
+.rung.t-med  .tier { color: var(--amber); }
+.rung.t-low  .tier { color: var(--muted); }
+
+/* ---------- persona row ---------- */
+
+.people { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 32px; margin: 24px 0 8px; }
+.person { padding: 20px 0; border-top: 1px solid var(--line); }
+.person .who { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: 17px; letter-spacing: -0.015em; }
+.person .role { font-family: "IBM Plex Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin: 5px 0 9px; }
+.person p { font-size: 15px; margin: 0 0 8px; max-width: none; }
+.person .win { font-size: 14px; color: var(--muted); font-style: italic; }
+
+/* ---------- verified block ---------- */
+
+.verified { background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius-lg); padding: 24px 26px; margin: 26px 0; }
+.verified .vhead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.verified .vhead h4 { margin: 0; color: var(--accent-ink); }
+.verified table { margin-top: 14px; }
+.verified td:last-child { text-align: end; }
+
+/* ---------- footer ---------- */
+
+footer {
+  margin-top: 84px; padding-top: 26px;
+  border-top: 2px solid var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+  color: var(--muted); line-height: 1.7;
+  display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="brandline">
+    <span class="wordmark">Toolr</span>
+    <span class="eyebrow">Phase&nbsp;1 · Architecture &amp; MVP definition</span>
+  </div>
+
+  <h1>Borrow the drill from the person 300&nbsp;metres away.</h1>
+
+  <p class="thesis">
+    An Android-first app for lending and renting tools between neighbours. Two buttons on the home
+    screen. Photograph a tool and it lists itself in about thirty seconds. Say what you need in plain
+    language and the app works out what tool that is. <em>Everything below exists to protect those two
+    moments.</em>
+  </p>
+
+  <div class="status"><span class="dot"></span>No app code written yet — by design. Schema applied and privacy-tested against live Postgres&nbsp;16&nbsp;+&nbsp;PostGIS.</div>
+
+  <dl class="strip">
+    <div><dt>Mobile</dt><dd>Expo<span>React Native · TypeScript</span></dd></div>
+    <div><dt>Backend</dt><dd>Supabase<span>Postgres + PostGIS</span></dd></div>
+    <div><dt>Vision AI</dt><dd>Gemini<span>Flash-Lite, server-side</span></dd></div>
+    <div><dt>Sign in</dt><dd>4 ways<span>guest · password · Google · +later</span></dd></div>
+    <div><dt>Payments in V1</dt><dd>None<span>free, or cash / Bit</span></dd></div>
+    <div><dt>Pilot run cost</dt><dd class="num">~$30<span>per month, all-in</span></dd></div>
+  </dl>
+</header>
+
+<div class="layout">
+
+  <aside class="toc">
+    <div class="toc-head">Contents</div>
+    <ol>
+      <li><a href="#product"><span class="toc-n">01</span>Product plan</a></li>
+      <li><a href="#tech"><span class="toc-n">02</span>Technical plan</a></li>
+      <li><a href="#ia"><span class="toc-n">03</span>Information architecture</a></li>
+      <li><a href="#data"><span class="toc-n">04</span>Database schema</a></li>
+      <li><a href="#ai"><span class="toc-n">05</span>AI identification</a></li>
+      <li><a href="#privacy"><span class="toc-n">06</span>Security &amp; privacy</a></li>
+      <li><a href="#next"><span class="toc-n">07</span>What happens next</a></li>
+    </ol>
+  </aside>
+
+  <main>
+
+  <!-- ============ 01 PRODUCT ============ -->
+  <section id="product">
+    <div class="sec-head"><span class="n">01</span><h2>Product plan</h2></div>
+
+    <p class="lede">
+      The product is two sentences long: <em>I need a drill → someone nearby has one → borrow it.</em>
+      Every feature that does not serve that sentence is a feature that makes the app feel like
+      equipment-management software.
+    </p>
+
+    <h3>Who it is for</h3>
+    <div class="people">
+      <div class="person">
+        <div class="who">Dana, 34</div>
+        <div class="role">Borrower — primary</div>
+        <p>Rents in Florentin. Wants to hang a TV. Owns a screwdriver. Will not buy a ₪400 hammer drill for one hole; currently asks the building WhatsApp group and hopes.</p>
+        <p class="win">Wins when she gets a drill within a 15-minute walk, today, with no awkward negotiation.</p>
+      </div>
+      <div class="person">
+        <div class="who">Yossi, 58</div>
+        <div class="role">Owner — primary</div>
+        <p>Forty tools, uses six. Likes helping neighbours, resents the clutter, distrusts apps that want his ID and bank details.</p>
+        <p class="win">Wins when listing takes under a minute and he can decline without feeling rude.</p>
+      </div>
+      <div class="person">
+        <div class="who">Adi, 41</div>
+        <div class="role">Owner — side income</div>
+        <p>Bought a pressure washer and a tile cutter for a renovation. Wants them to pay for themselves. Cares about damage and about who is borrowing.</p>
+        <p class="win">Wins on predictable small income and confidence the tool comes back.</p>
+      </div>
+      <div class="person">
+        <div class="who">Michal, 67</div>
+        <div class="role">Both — accessibility case</div>
+        <p>Mid-range Android, small text feels small, wants to lend her late husband's tools rather than throw them out. Needs large targets and plain Hebrew.</p>
+        <p class="win">Wins when she never has to ask her son for help.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="k">Anti-persona</span>
+      <p>The professional rental shop. Commercial accounts are excluded from the MVP on purpose — they
+      change the tone from <em>neighbour</em> to <em>vendor</em>, and their inventory would drown out the
+      free listings that make the product worth opening.</p>
+    </div>
+
+    <h3>Scope</h3>
+    <div class="scope">
+      <div>
+        <h4>Ships in V1</h4>
+        <ul>
+          <li><span class="m">+</span>Onboarding, 3 screens, skippable</li>
+          <li><span class="m">+</span>Guest mode — browse, search, map, favourite</li>
+          <li><span class="m">+</span>Email + password, with reset and confirmation</li>
+          <li><span class="m">+</span>Google Sign-In, native One Tap</li>
+          <li><span class="m">+</span>Auth wall only at the moment of action</li>
+          <li><span class="m">+</span>Coarse location, with a manual-area fallback</li>
+          <li><span class="m">+</span>Nearby search — list and map</li>
+          <li><span class="m">+</span>Natural-language and voice search</li>
+          <li><span class="m">+</span>Tool detail with fuzzed location</li>
+          <li><span class="m">+</span>Camera-first listing flow</li>
+          <li><span class="m">+</span>AI identification with mandatory confirmation</li>
+          <li><span class="m">+</span>AI short description, editable</li>
+          <li><span class="m">+</span>FREE or ₪/day listings</li>
+          <li><span class="m">+</span>Borrow request, accept / decline</li>
+          <li><span class="m">+</span>Scoped realtime chat with quick replies</li>
+          <li><span class="m">+</span>Exact pickup location released on accept</li>
+          <li><span class="m">+</span>Return confirmation, both sides</li>
+          <li><span class="m">+</span>Two-sided ratings, double-blind</li>
+          <li><span class="m">+</span>Transactional push notifications</li>
+          <li><span class="m">+</span>Minimal profiles, favourites</li>
+          <li><span class="m">+</span>Report, block, damage report</li>
+          <li><span class="m">+</span>Safety notes on risky categories</li>
+          <li><span class="m">+</span>English + Hebrew with full RTL</li>
+          <li><span class="m">+</span>In-app account and data deletion</li>
+          <li><span class="m">+</span>Thin “I need a tool” broadcast</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Deliberately not in V1</h4>
+        <ul>
+          <li><span class="m">−</span>In-app payments</li>
+          <li><span class="m">−</span>Deposits</li>
+          <li><span class="m">−</span>ID verification</li>
+          <li><span class="m">−</span>Phone / SMS authentication</li>
+          <li><span class="m">−</span>Facebook and Apple sign-in</li>
+          <li><span class="m">−</span>Guest <em>borrowing</em></li>
+          <li><span class="m">−</span>Insurance and claims adjudication</li>
+          <li><span class="m">−</span>Delivery or courier</li>
+          <li><span class="m">−</span>Tool bundles, groups, clubs</li>
+          <li><span class="m">−</span>Commercial accounts</li>
+          <li><span class="m">−</span>Subscriptions</li>
+          <li><span class="m">−</span>The task→toolkit AI advisor</li>
+          <li><span class="m">−</span>Web app and iOS</li>
+        </ul>
+        <p style="font-size:14.5px;color:var(--muted);margin:16px 0 0;max-width:none;">
+          Every exclusion has its column, table or enum value already in the schema. Turning each on is an
+          implementation, not a migration against live data.
+        </p>
+      </div>
+    </div>
+
+    <h3>Monetization</h3>
+    <p>
+      Ranked by fit, not by revenue. Toolr's whole value is the free-lending culture, so monetization
+      must never tax generosity.
+    </p>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Fit</th><th>Needs</th></tr></thead>
+      <tbody>
+        <tr><td><strong>10–15% take rate on paid rentals only.</strong> Free lends stay free forever.</td><td><span class="chip ok">Best fit</span></td><td>A PSP with marketplace payouts</td></tr>
+        <tr><td><strong>Deposit handling fee</strong> — flat ₪5–10 to hold and release. Only touches expensive tools.</td><td><span class="chip ok">Good</span></td><td>Payment rails</td></tr>
+        <tr><td><strong>“Toolr Protect”</strong> — optional ₪5 coverage per rental, backed by an insurer. The strongest trust unlock in the category.</td><td><span class="chip ok">Good</span></td><td>Insurance partner</td></tr>
+        <tr><td><strong>Neighbourhood plans</strong> — a building committee pays for a shared tool locker.</td><td><span class="chip">B2B2C wedge</span></td><td>Density first</td></tr>
+        <tr><td><strong>Promoted listings</strong> for local hardware shops.</td><td><span class="chip warn">Tone risk</span></td><td>Organic density first</td></tr>
+        <tr><td>Charging to list, charging to browse, gating distance, running ads.</td><td><span class="chip crit">Never</span></td><td>—</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>MVP monetization: none.</strong> Revenue now is a distraction from the only number that
+    matters — whether the second borrow happens.</p>
+
+    <h3>Risk register</h3>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th style="width:36px">#</th><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td class="num">R1</td><td>AI states a wrong model; a borrower walks 800&nbsp;m for a rotary hammer and finds a drill</td><td><span class="chip warn">High</span></td><td>Confirmation is mandatory; <code>model</code> forced to null below 0.70 confidence; “Generic X” always offered</td></tr>
+        <tr><td class="num">R2</td><td>Location leak — a query returns an exact home coordinate</td><td><span class="chip crit">Critical</span></td><td>Exact points in a separate owner-only table; one <code>SECURITY DEFINER</code> read path; tested, see §06</td></tr>
+        <tr><td class="num">R3</td><td>Two-sided cold start — zero tools means zero users</td><td><span class="chip crit">Critical</span></td><td>One neighbourhood, hand-seeded; empty states convert into tool requests so demand creates supply</td></tr>
+        <tr><td class="num">R4</td><td>Hebrew RTL defects — mirrored icons, wrong-side chevrons, mixed numerals</td><td><span class="chip warn">Medium</span></td><td>RTL from the first commit; logical layout properties only; RTL screenshot pass in the release checklist</td></tr>
+        <tr><td class="num">R5</td><td>AI cost abuse — someone scripts 10,000 identification calls</td><td><span class="chip warn">Medium</span></td><td>Key server-side only, auth required, per-user daily quota enforced in Postgres</td></tr>
+        <tr><td class="num">R6</td><td>Geo query degradation as listings grow</td><td><span class="chip warn">Medium</span></td><td>GiST + <code>ST_DWithin</code>; verified as an index scan at 5,000 rows</td></tr>
+        <tr><td class="num">R7</td><td>Supabase free tier pauses a project after ~7 idle days</td><td><span class="chip">Low</span></td><td>Move to Pro the week before the pilot</td></tr>
+        <tr><td class="num">R8</td><td>Play rejection — Data Safety mismatch, missing deletion, permission justification</td><td><span class="chip warn">Medium</span></td><td>Data Safety form derived from a real data inventory; deletion built in V1; in-context permission rationales</td></tr>
+        <tr><td class="num">R9</td><td>Push swallowed by aggressive OEM battery management</td><td><span class="chip warn">Medium</span></td><td>High-priority messages for time-critical events; the in-app inbox is the source of truth</td></tr>
+        <tr><td class="num">R10</td><td>Liability for injury or property damage</td><td><span class="chip crit">High</span></td><td>Risk-level acknowledgements, honest ToS, no implied vetting anywhere in the UI. <strong>Needs a lawyer before launch — not a template.</strong></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>What success looks like in the pilot</h3>
+    <p>Four numbers, and one diagnostic:</p>
+    <ul>
+      <li><strong>Listing completion rate</strong> and median time to list — target ≥70%, ≤60&nbsp;seconds.</li>
+      <li><strong>Search → borrow request</strong> — target ≥8% of searches that return a result.</li>
+      <li><strong>Request → completed exchange</strong> — target ≥40%.</li>
+      <li><strong>Repeat rate</strong> — borrowers who borrow again within 30 days. The only honest PMF signal.</li>
+      <li><em>Diagnostic:</em> AI acceptance rate — accepted as-is vs corrected vs rejected. This tells us whether the thirty-second promise is real.</li>
+    </ul>
+  </section>
+
+  <!-- ============ 02 TECH ============ -->
+  <section id="tech">
+    <div class="sec-head"><span class="n">02</span><h2>Technical plan</h2></div>
+
+    <p class="lede">
+      Each decision below is stated with the alternative it beat. The weighting throughout: solo builder,
+      cost-sensitive, Android-first, Israel-first.
+    </p>
+
+    <div class="decisions">
+
+      <div class="decision">
+        <div class="role">Mobile</div>
+        <div>
+          <div class="pick">React Native + Expo, TypeScript</div>
+          <p>One language from screen to server: Edge Functions are Deno/TypeScript, and types generated
+          from the Postgres schema are imported by both. EAS builds the APK in the cloud, so there is no
+          Android Studio on the critical path. Camera, location, notifications, localization and image
+          manipulation are all first-party modules. <code>expo-updates</code> ships a JS fix without a
+          Play review — worth a great deal in the first weeks of a pilot.</p>
+          <p class="rejected"><b>Instead of</b> Flutter — genuinely better for pixel-identical custom UI, but it splits the stack into Dart and TypeScript and has no equally clean OTA story. And native Kotlin, which is the best Android result and the worst time-to-MVP.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Backend</div>
+        <div>
+          <div class="pick">Supabase</div>
+          <p>This is really a geospatial decision. The core query is <em>“active tools within R metres,
+          matching these types, ranked”</em> — one indexed <code>ST_DWithin</code> in PostGIS. Firestore
+          has no native geo query; the standard workaround is geohash prefix ranges fanned across nine
+          bounding-box queries and re-filtered on device, and it composes badly with the price,
+          availability and category filters we need. Row Level Security then expresses the privacy rule
+          as a database policy rather than a thing every code path must remember.</p>
+          <p class="rejected"><b>Instead of</b> Firebase — better push and Google Sign-In ergonomics, but Cloud Functions require the paid Blaze plan just to exist, and the geo story is a workaround. We cover the gap with Expo Push, Sentry and PostHog.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Identity</div>
+        <div>
+          <div class="pick">Guest · email + password · Google</div>
+          <p>Four ways in, one ladder. <strong>Guest</strong> is automatic on first open — no tap, no form
+          — and is a real Supabase <em>anonymous session</em>. <strong>Member</strong> is email + password
+          or Google One Tap. <strong>Verified</strong> (phone, then ID) comes in V1.1 and is what unlocks
+          higher-value tools once deposits exist. Facebook and Apple sit behind one
+          <code>signInWith(provider)</code> function and one button row.</p>
+          <p><strong>Guests browse; they do not borrow.</strong> A borrow request is the moment a
+          neighbour hands over physical property. If the person on the other side is unaccountable, the
+          owner carries all the risk — and the predictable outcome isn't happy guests, it's owners
+          switching guest requests off after the first tool that doesn't come back. Requiring an account
+          at that exact moment costs one tap and buys the owner a name, a verified email, and a rating
+          history to build on.</p>
+          <p class="rejected"><b>Why a session and not just the anon key</b> Identity linking keeps the <em>same</em> user id through the upgrade — so a guest who hearted four drills finds four hearted drills after signing in, with no migration step. It also gives each guest a rate-limit bucket for AI search, and puts the <code>is_anonymous</code> claim in the JWT so <code>is_member()</code> can gate every write policy in Postgres rather than in each screen.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Passwords</div>
+        <div>
+          <div class="pick">Not a toggle — budget real work for it</div>
+          <p><strong>Custom SMTP is mandatory from day one.</strong> Supabase's built-in sender is capped
+          at <strong>2 messages per hour</strong> and only delivers to pre-authorised team addresses, with
+          no delivery SLA. It physically cannot send a user a password reset. Resend's free tier covers
+          the pilot; verify SPF and DKIM or the mail lands in spam and people conclude the app is broken.</p>
+          <p>Leaked-password protection on (HaveIBeenPwned), minimum length 8, a strength meter that
+          advises rather than blocks — no forced symbol-and-digit rules, which reliably produce
+          <code>Passw0rd!</code> and nothing else. The reset form returns an identical response whether or
+          not the address exists, so it isn't an account-enumeration oracle.</p>
+          <p class="rejected"><b>The collision everyone hits</b> Dana signs up with a password, then three weeks later taps Continue with Google on the same address. Decision: auto-link, but only when both sides have a <em>verified</em> email. Auto-linking on an unverified address is exactly how account-takeover-by-signup works.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Maps</div>
+        <div>
+          <div class="pick">react-native-maps, Google provider</div>
+          <p>Correct Hebrew labelling out of the box, which matters more for an Israeli launch than
+          styling flexibility. Pins are clustered; a tool page draws a circle, not a pin. Reverse
+          geocoding for the neighbourhood label runs on-device, once, at listing time — so we pay for no
+          geocoding at all.</p>
+          <p class="rejected"><b>Watch this</b> Google restructured Maps pricing in 2025; mobile map loads are now billed SKUs with a monthly free threshold rather than unlimited-free. MVP volumes sit inside it, but set a quota cap and a billing alert on day one. All map usage sits behind one component, so MapLibre is a contained swap.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Push</div>
+        <div>
+          <div class="pick">Expo Push Service → FCM v1</div>
+          <p>Free, and it abstracts the FCM setup. Sending happens only server-side. Every notification is
+          also a row in <code>notifications</code>, rendered in an in-app inbox — push is a convenience,
+          the inbox is the truth. That is the mitigation for OEM battery managers that silently drop
+          messages. Seven transactional types in V1, per-type toggles from day one, no marketing pushes.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">AI</div>
+        <div>
+          <div class="pick">Gemini Flash-Lite, server-side only</div>
+          <p>The cheapest capable multimodal tier, with schema-constrained JSON output. A 1024&nbsp;px
+          photo costs a fraction of an agora to identify. The same function handles natural-language
+          query interpretation, cached by query hash so popular searches cost nothing.</p>
+          <p class="rejected"><b>Instead of</b> Cloud Vision label detection, which returns “tool / hardware / machine”, and Vision Product Search, which requires you to build the catalogue — the actual hard part. <strong>There is no public Google Lens API</strong>; the brief was right to flag it. Anything advertised as one is a scraper.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Analytics</div>
+        <div>
+          <div class="pick">PostHog (EU) + Sentry</div>
+          <p>Both free at this scale. Autocapture off — events are instrumented deliberately, about
+          twenty-five of them. No PII in properties: the user is a Supabase UUID, never an email, name,
+          phone or coordinate. Sentry's <code>beforeSend</code> scrubs coordinates and message bodies.</p>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="role">Payments</div>
+        <div>
+          <div class="pick">None in V1 — and a provider interface, not a Stripe integration</div>
+          <p>Google Play's Payments policy explicitly excludes <em>“purchases or rentals of physical
+          goods”</em> from the Play Billing requirement, so a peer-to-peer tool rental owes Google
+          nothing. Play is not the obstacle. <strong>Israel is:</strong> Stripe does not currently list
+          Israel among its supported countries, which rules out Stripe Connect — the default marketplace
+          answer — for an Israeli platform.</p>
+          <p>So the schema carries <code>payment_provider</code>, <code>payment_status</code>,
+          <code>provider_ref</code>, <code>platform_fee_agorot</code> and <code>deposit_agorot</code>, all
+          inert, behind a <code>PaymentProvider</code> interface whose only V1 implementation records
+          intent and moves no money. Candidates for later — Tranzila, Cardcom, Grow/Meshulam, PayPlus,
+          Rapyd — all need direct diligence on payouts <em>to individuals</em>, which is the hard part.</p>
+          <p class="rejected"><b>In the product</b> a listing is FREE, or “₪X/day, paid directly to the owner”. In Israel that means cash or Bit, which everyone already has. This is not a compromise: it removes KYC, chargebacks, tax reporting and dispute liability from the MVP entirely.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <h3>What it costs to run</h3>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Service</th><th>For</th><th>MVP plan</th><th class="num">Cost</th></tr></thead>
+      <tbody>
+        <tr><td>Supabase</td><td>DB, auth, storage, realtime, functions</td><td>Free → Pro at pilot</td><td class="num">$0 → $25/mo</td></tr>
+        <tr><td>Gemini API</td><td>Identification + query interpretation</td><td>Pay as you go, Flash-Lite</td><td class="num">&lt; $5/mo</td></tr>
+        <tr><td>Google Maps Platform</td><td>Map display</td><td>Free threshold + quota cap</td><td class="num">~$0</td></tr>
+        <tr><td><strong>Resend</strong> (or Postmark/SES)</td><td>Password reset and email confirmation — <strong>mandatory</strong>, Supabase's own sender cannot do it</td><td>Free tier</td><td class="num">$0</td></tr>
+        <tr><td>Cloudflare Turnstile</td><td>CAPTCHA on anonymous sign-in</td><td>Free</td><td class="num">$0</td></tr>
+        <tr><td>Expo EAS</td><td>Builds, OTA, push</td><td>Free tier</td><td class="num">$0</td></tr>
+        <tr><td>Firebase (FCM only)</td><td>Android push transport</td><td>Spark</td><td class="num">$0</td></tr>
+        <tr><td>PostHog EU · Sentry</td><td>Analytics · crashes</td><td>Free tiers</td><td class="num">$0</td></tr>
+        <tr><td>Google Play Console</td><td>Distribution</td><td>One-time</td><td class="num">$25 once</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>≈ $25–35 per month for the pilot</strong>, plus $25 once. No payment provider, by design.</p>
+  </section>
+
+  <!-- ============ 03 IA ============ -->
+  <section id="ia">
+    <div class="sec-head"><span class="n">03</span><h2>Information architecture</h2></div>
+
+    <p class="lede">
+      Five tabs with a raised centre button. The two big buttons the brief asks for live on Home, because
+      that is the path for someone using the app for the third time in their life. The tab bar is the
+      escape hatch for someone using it for the thirtieth. There is no hamburger menu — and no sign-in
+      screen standing in front of any of it.
+    </p>
+
+    <pre>app/
+├─ <b>(onboarding)/</b>   welcome · lend · location          <span class="c">3 screens, skippable</span>
+│
+├─ <b>(tabs)/</b>         index · browse · <b>[ + ]</b> · inbox · me
+│
+├─ <b>search/</b>         index · results                     <span class="c">text · voice · categories</span>
+├─ <b>tool/</b>           [id] · [id]/photos · [id]/request
+│
+├─ <b>list/</b>           camera → identifying → confirm      <span class="c">the 30-second flow</span>
+│                  → manual → details → success
+│
+├─ <b>request/</b>        new · [id]                          <span class="c">"I need a tool" broadcast</span>
+├─ <b>transaction/</b>    [id] · pickup · return · rate · issue
+├─ <b>chat/</b>           [conversationId]
+├─ <b>profile/</b>        [userId]
+├─ <b>me/</b>             tools · borrowing · lending · favorites · edit
+│                  settings/ notifications · language · privacy
+│                            legal · delete-account
+└─ <b>auth/</b>           sign-in · sign-up · check-email     <span class="c">a sheet, never a gate</span>
+                  forgot-password · reset-password</pre>
+
+    <h3>The screens that carry the product</h3>
+
+    <h4>Home</h4>
+    <p>App name small. A location chip reading <em>“Florentin · change”</em>. A search field placeholder,
+    <em>“What do you need?”</em>. Then two full-width buttons at least 64&nbsp;dp tall —
+    <strong>🔍 I need a tool</strong> and <strong>➕ I have a tool</strong> — and a horizontal
+    <em>Near you</em> carousel. Nothing else. No feed, no promos, no stats.</p>
+
+    <h4>Results</h4>
+    <p>A list row is photo, title, <code>📍 350 m</code>, <strong>FREE</strong> or <code>₪15/day</code>,
+    <code>★ 4.9</code>, heart. Filters sit in a quiet bar, visually secondary. When a query was
+    interpreted by AI, a dismissible chip says so — <em>“Showing hammer drills and rotary hammers for
+    ‘hole in a concrete wall’”</em> — with <strong>Search the exact words instead</strong>. Silent query
+    rewriting is the fastest way to make search feel broken.</p>
+
+    <h4>The listing flow</h4>
+    <p>Camera opens immediately; no form comes first. Identification runs for at most 12 seconds against a
+    scan overlay, then the confirmation screen, then a single details screen with exactly two decisions —
+    <strong>FREE / RENT ₪__ per day</strong> and <strong>Available now / Choose dates / Ask me</strong> —
+    with everything else collapsed under <em>Add more details</em>. Then <strong>LIST TOOL</strong>.</p>
+
+    <h4>Pickup</h4>
+    <p>Reachable only once a request is accepted. This is the screen where the exact address appears, and
+    the only one that has it.</p>
+
+    <h4>Signing in</h4>
+    <p>Never a full-screen gate. A bottom sheet rises over whatever the person was doing, and its headline
+    names the action rather than the ceremony: <em>“Sign in to ask Yossi for the drill”</em>, not
+    <em>“Create an account”</em>. <strong>Continue with Google</strong>, a divider, an email field.
+    Dismissing it leaves them a guest with everything they had; completing it returns them to the exact
+    borrow request they had half-composed. Five screens in total —
+    sign-in, sign-up, check-your-email, forgot-password, reset-password — plus a
+    <em>Sign-in &amp; security</em> settings screen that shows what is linked and lets someone add a
+    password to a Google account or the reverse.</p>
+
+    <div class="callout warn">
+      <span class="k">Empty states are a feature here, not a fallback</span>
+      <p><strong>No tools nearby:</strong> <em>“Nothing nearby yet. Try a wider radius — or post what
+      you're looking for and we'll let nearby owners know.”</em> with <strong>Widen to 3 km</strong> and
+      <strong>Post a request</strong>. In a marketplace this thin, the empty state is the growth
+      mechanism: it converts unmet demand into a broadcast that creates supply.</p>
+      <p><strong>No listings:</strong> <em>“Your toolbox is looking lonely. Add your first tool.”</em></p>
+    </div>
+
+    <h3>Rules that keep it consistent</h3>
+    <ul>
+      <li><strong>Loading</strong> is skeletons matching the final layout — never a spinner on a full screen, and nothing at all under 400&nbsp;ms so there is no flash.</li>
+      <li><strong>Permission denial is never a dead end.</strong> Location denied → manual area picker. Camera denied → gallery. Notifications denied → the inbox still works.</li>
+      <li><strong>Offline</strong> keeps cached results readable and queues writes as <em>pending</em>, retried on reconnect.</li>
+      <li><strong>AI failure</strong> always falls through to the manual picker within 12 seconds. The listing flow can never be blocked by the AI — that is the difference between a delightful shortcut and a dependency.</li>
+      <li><strong>RTL</strong> uses only logical properties — <code>marginStart</code>, never <code>marginLeft</code> — and every directional icon goes through one mirroring helper.</li>
+    </ul>
+  </section>
+
+  <!-- ============ 04 DATA ============ -->
+  <section id="data">
+    <div class="sec-head"><span class="n">04</span><h2>Database schema</h2></div>
+
+    <p class="lede">
+      24 tables, 18 enums, 39 RLS policies, 10 functions. The full migration is in
+      <code>sql/001_initial_schema.sql</code>; what follows is why it is shaped this way.
+    </p>
+
+    <pre>auth.users
+   └─1:1─ <b>profiles</b> ──1:1── <b>user_private</b>        <span class="c">phone, home point — self only</span>
+            │       ──1:N── user_devices · notification_prefs
+            │
+            ├─1:N─ <b>tools</b> ──1:1── <b>tool_locations</b>   <span class="c">◄ EXACT coords, owner only</span>
+            │        │     ──1:N── tool_photos · tool_availability
+            │        │
+            │        └─1:N─ <b>borrow_requests</b> ──1:1── <b>transactions</b> ──1:N── ratings
+            │                      │                        └──1:N── disputes
+            │                      └─1:1── conversations ──1:N── messages
+            │
+            ├─1:N─ tool_requests ──1:N── tool_request_offers
+            ├─1:N─ favorites · notifications · reports · blocks
+            └─1:N─ ai_identification_results · ai_usage_quota</pre>
+
+    <h3>The decisions that matter</h3>
+
+    <h4>Guests are rows in <code>auth.users</code> and nowhere else</h4>
+    <p>
+      A guest has an <code>auth.users</code> row with <code>is_anonymous = true</code> and deliberately no
+      <code>profiles</code> row — they cannot list, borrow, message or rate, so a profile for them would
+      be junk. <code>provision_member()</code> creates it at exactly two moments: a normal sign-up, and
+      the instant a guest upgrades. Two foreign keys point at <code>auth.users</code> rather than
+      <code>profiles</code>, both deliberately: <code>favorites</code>, so a guest's hearts survive the
+      upgrade untouched, and <code>ai_usage_quota</code>, so guests get their own rate-limit bucket rather
+      than an IP bucket that punishes everyone behind one café's Wi-Fi.
+    </p>
+    <p>
+      <code>verification_level</code> only ever moves upward. Confirming an email must never downgrade
+      someone who has already verified a phone — an easy bug to write and an infuriating one to receive.
+    </p>
+
+    <h4>The location split is the architecture</h4>
+    <p>
+      Postgres RLS is <em>row</em>-level, not column-level — so a public read policy on <code>tools</code>
+      would expose every column on that row, coordinates included. Putting the exact point in its own
+      table is the only way to say “this row is public, that coordinate is not” and have the database
+      enforce it rather than the application remember it.
+    </p>
+
+    <h4>Money is bigint agorot</h4>
+    <p>
+      ₪15/day is <code>1500</code>. Never a float, never a decimal type. Every money row also carries
+      <code>currency char(3)</code>, so expanding beyond ILS is a configuration change rather than a
+      migration.
+    </p>
+
+    <h4>Requests and transactions are separate tables</h4>
+    <p>
+      <code>borrow_requests</code> is the negotiation; <code>transactions</code> is the commitment,
+      created only on acceptance. Collapsing them into one row with a bigger enum sounds simpler until
+      you need to expire unanswered requests without touching real transactions, or count requests sent
+      separately from exchanges completed.
+    </p>
+
+    <h4>Ratings are double-blind</h4>
+    <p>
+      A rating publishes when both sides have rated, or after seven days. Without that window the first
+      rater sets the tone and the second rates retaliatorily. Reputation counters only move when a rating
+      publishes — and <code>smoothed_rating()</code> applies a Bayesian prior so one 5-star review does
+      not outrank forty 4.8s. In a young marketplace where most people have one or two reviews, that
+      single function is the difference between a ranking that means something and one that doesn't.
+    </p>
+
+    <h4>The AI tables are the evaluation dataset</h4>
+    <p>
+      <code>ai_identification_results</code> stores the raw response, the validated parse, the
+      confidence — and <strong>what the user did about it</strong>. That last column is the product's most
+      valuable telemetry: it is the direct measurement of whether the thirty-second promise holds.
+    </p>
+
+    <div class="verified">
+      <div class="vhead"><h4>Verified, not asserted</h4><span class="chip ok">Ran against Postgres 16 + PostGIS</span></div>
+      <p style="margin:0;font-size:15.5px;">The migration was applied to a live database and its guarantees exercised. These assertions belong in CI — they are what stops a future migration from quietly publishing everyone's home address.</p>
+      <div class="tablewrap">
+      <table>
+        <tbody>
+          <tr><td>Fuzz offset distance from the true point</td><td class="num"><strong>114 m</strong> <span class="chip ok">in band</span></td></tr>
+          <tr><td>Fuzz is deterministic across repeated reads</td><td class="num"><strong>true</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td>Signed-in user reading another owner's <code>tool_locations</code></td><td class="num"><strong>0 rows</strong> <span class="chip ok">blocked</span></td></tr>
+          <tr><td>Anonymous client reading <code>tool_locations</code></td><td class="num"><strong>0 rows</strong> <span class="chip ok">blocked</span></td></tr>
+          <tr><td>Anonymous client reading active <code>tools</code></td><td class="num"><strong>5,002 rows</strong> <span class="chip ok">browse works</span></td></tr>
+          <tr><td>Geo query plan at 5,000 listings</td><td class="num"><strong>Bitmap Index Scan</strong> <span class="chip ok">GiST used</span></td></tr>
+          <tr><td>Ranking sanity — one 5★ review vs forty 4.8★</td><td class="num"><strong>4.67 &lt; 4.78</strong> <span class="chip ok">correct</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="margin:18px 0 0;font-size:15.5px;">And the guest boundary, exercised the same way:</p>
+      <div class="tablewrap">
+      <table>
+        <tbody>
+          <tr><td>Member sign-up provisions a profile</td><td class="num"><strong>1 row</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td>Guest sign-up provisions a profile</td><td class="num"><strong>0 rows</strong> <span class="chip ok">as intended</span></td></tr>
+          <tr><td><code>is_member()</code> for a guest</td><td class="num"><strong>false</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td>Guest browsing and running the search RPC</td><td class="num"><strong>works</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td>Guest adding a favourite</td><td class="num"><strong>allowed</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td><strong>Guest inserting a borrow request</strong></td><td class="num"><strong>refused</strong> <span class="chip ok">RLS blocked</span></td></tr>
+          <tr><td>Upgrade → profile created, same user id</td><td class="num"><strong>“Dana”</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td>Guest's favourite after the upgrade</td><td class="num"><strong>still there</strong> <span class="chip ok">pass</span></td></tr>
+          <tr><td>Confirming email on a phone-verified profile</td><td class="num"><strong>stays phone</strong> <span class="chip ok">no downgrade</span></td></tr>
+          <tr><td><code>purge_stale_guests()</code> on a 90-day guest</td><td class="num"><strong>1 removed</strong> <span class="chip ok">pass</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <h3>Ranking, in SQL so it can be tuned without an app release</h3>
+    <pre>score = 0.45 × distance      <span class="c">exponential decay, 500 m half-life</span>
+      + 0.20 × availability  <span class="c">now &gt; dated &gt; ask</span>
+      + 0.15 × fit           <span class="c">exact tool_type &gt; category &gt; text match</span>
+      + 0.12 × reputation    <span class="c">Bayesian-smoothed owner rating</span>
+      + 0.08 × free</pre>
+    <p>
+      Blocks are applied <em>inside</em> the search query, in both directions. Filtering blocked users in
+      the client is how they keep reappearing in the one screen somebody forgot about.
+    </p>
+  </section>
+
+  <!-- ============ 05 AI ============ -->
+  <section id="ai">
+    <div class="sec-head"><span class="n">05</span><h2>AI tool identification</h2></div>
+
+    <div class="callout">
+      <span class="k">The governing rule</span>
+      <p>The AI is a shortcut, never an authority. It fills the form faster than the person could. The
+      person always approves. <strong>The app must work identically, only slower, when the AI is wrong,
+      slow, or down.</strong></p>
+    </div>
+
+    <h3>Pipeline</h3>
+    <pre><b>PHONE</b>   capture → resize to 1024 px, q0.70, <b>strip EXIF including GPS</b>
+        → upload to private bucket ai-temp/
+        → POST /functions/v1/identify-tool  + user JWT
+           │
+<b>SERVER</b>  ├ verify JWT
+        ├ consume_ai_quota('identify', 25)         <span class="c">429 if over budget</span>
+        ├ validate image by magic bytes, ≤8 MB, ≤4096 px
+        ├ call Gemini with a responseSchema
+        ├ Zod-validate · one repair attempt · then fail closed
+        ├ <b>apply the confidence policy</b>              <span class="c">blanks unsure model numbers</span>
+        └ persist to ai_identification_results
+           │
+<b>PHONE</b>   confirmation screen → <b>USER CONFIRMS</b> → listing draft pre-filled</pre>
+    <p>Every arrow has a timeout and a fallback. The client budget is 12 seconds; past that the user
+    lands on the manual picker with their photo already attached.</p>
+
+    <h3>The confidence policy</h3>
+    <p>
+      This runs <strong>server-side</strong>, so the client cannot be tricked into displaying an
+      overconfident claim. Before anything is returned:
+    </p>
+    <pre>if (model_confidence &lt; 0.70) model = null   <span class="c">do not state a model we're unsure of</span>
+if (brand_confidence &lt; 0.60) brand = null</pre>
+
+    <div class="ladder">
+      <div class="rung t-high">
+        <div class="tier">High<span>type ≥ 0.80</span></div>
+        <div>
+          <p class="say">“We think this is: <b>Bosch GSB 18V-55</b> Cordless Combi Drill”</p>
+          <p class="do">One candidate. <strong>YES</strong> / <strong>NOT QUITE</strong>.</p>
+        </div>
+      </div>
+      <div class="rung t-med">
+        <div class="tier">Medium<span>0.50 – 0.79</span></div>
+        <div>
+          <p class="say">“Which looks closest?”</p>
+          <p class="do">Two to four ranked options, each tagged <em>Possible match</em>, plus <strong>None of these</strong>.</p>
+        </div>
+      </div>
+      <div class="rung t-low">
+        <div class="tier">Low<span>&lt; 0.50</span></div>
+        <div>
+          <p class="say">“We couldn't tell what this is. What kind of tool is it?”</p>
+          <p class="do">Candidates suppressed entirely. Straight to the category grid.</p>
+        </div>
+      </div>
+      <div class="rung t-low">
+        <div class="tier">Not a tool<span>is_tool: false</span></div>
+        <div>
+          <p class="say">“That doesn't look like a tool. Try another photo?”</p>
+          <p class="do">With <strong>Add it manually</strong> beside it. This check also blocks obvious junk uploads.</p>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Three phrases are shown to users, consistently, and <strong>never a percentage</strong>:
+      <strong>Likely</strong> · <strong>Possible match</strong> · <strong>Model uncertain</strong>.
+      “83% confident” reads as precision the model does not have; people either over-trust it or find it
+      baffling. <em>“Just call it a generic cordless drill”</em> appears on every variant including the
+      high-confidence one — it is often the honest answer and always the fastest.
+    </p>
+    <p>
+      Listings carry the provenance: <code>is_model_confirmed</code> is true only when a human confirmed a
+      specific model, and unconfirmed models render with the same uncertainty treatment on the borrower's
+      screen that the owner saw. That symmetry is the whole point.
+    </p>
+
+    <h3>Natural language, and where it goes next</h3>
+    <pre>"I need to make a hole in a concrete wall"
+   ↓ sha256 cache hit?  →  return, 0 tokens, ~5 ms
+   ↓ miss → Gemini, text only, JSON schema
+{ "tool_types": ["rotary-hammer", "hammer-drill", "cordless-drill"],
+  "keywords":   ["concrete", "masonry", "SDS"],
+  "explanation_en": "hammer drills and rotary hammers" }
+   ↓
+search_tools_nearby(..., p_tool_types =&gt; [...])</pre>
+    <p>
+      Popular queries are interpreted once, ever. The interpretation is always shown and always
+      reversible. If the function fails or the user is offline it degrades to keyword search — slightly
+      worse results, zero breakage. Voice input is native on-device speech-to-text, including Hebrew, and
+      enters this same path: voice is an input method, not a separate feature.
+    </p>
+
+    <div class="callout">
+      <span class="k">Phase 3 — the feature this architecture is really for</span>
+      <p>
+        <em>“I want to hang a TV on a concrete wall”</em> → a structured kit: hammer drill (required),
+        8&nbsp;mm masonry bit (required), spirit level (required), stud detector (recommended, avoid
+        drilling into wiring), screwdriver — then one nearby search per item and a single answer:
+        <strong>“3 of 5 available within 1 km.”</strong>
+      </p>
+      <p>
+        Nothing in the MVP schema has to change for this. <code>interpret-query</code> already returns a
+        <em>list</em> of tool types and <code>search_tools_nearby</code> already accepts a
+        <code>text[]</code> of them. What it needs is a curated task→kit knowledge base, because a model
+        left alone will confidently invent drill-bit diameters. That is why it is Phase 3.
+      </p>
+      <p style="color:var(--muted);font-size:15px;">
+        Worth noting and not worth building yet: <em>“you'll also need 8 mm wall plugs”</em> is the most
+        natural local-hardware-shop moment this product will ever have.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 06 PRIVACY ============ -->
+  <section id="privacy">
+    <div class="sec-head"><span class="n">06</span><h2>Security &amp; privacy</h2></div>
+
+    <p class="lede">
+      Toolr asks people to publish, on a map, the approximate location of a valuable object inside their
+      home. Getting this wrong is not a bug. It is a burglary tool.
+    </p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 720 260" role="img" aria-label="Diagram: the exact home point stays in a private table; a stable 100 to 200 metre offset is published; distance is rounded to 50 metres; the exact address is released only after a request is accepted.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--line-strong)"></path>
+          </marker>
+        </defs>
+
+        <!-- private zone -->
+        <rect x="8" y="26" width="212" height="200" rx="10" fill="var(--surface-2)" stroke="var(--line)"></rect>
+        <text x="20" y="48" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--danger)" letter-spacing="1.2">PRIVATE · OWNER ONLY</text>
+        <text x="20" y="66" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">tool_locations</text>
+
+        <circle cx="114" cy="146" r="6" fill="var(--danger)"></circle>
+        <text x="114" y="172" text-anchor="middle" font-family="Newsreader, serif" font-size="13" fill="var(--ink)">exact home point</text>
+        <text x="114" y="192" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--muted)">RLS: owner only</text>
+
+        <!-- arrow 1 -->
+        <line x1="228" y1="126" x2="272" y2="126" stroke="var(--line-strong)" stroke-width="1.5" marker-end="url(#ar)"></line>
+        <text x="250" y="114" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--muted)">trigger</text>
+
+        <!-- public zone -->
+        <rect x="284" y="26" width="212" height="200" rx="10" fill="var(--surface)" stroke="var(--accent)"></rect>
+        <text x="296" y="48" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--accent)" letter-spacing="1.2">PUBLIC</text>
+        <text x="296" y="66" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">tools.fuzzed_location</text>
+
+        <circle cx="390" cy="146" r="44" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4 4"></circle>
+        <circle cx="390" cy="146" r="2.5" fill="var(--line-strong)"></circle>
+        <circle cx="418" cy="124" r="6" fill="var(--accent)"></circle>
+        <text x="390" y="212" text-anchor="middle" font-family="Newsreader, serif" font-size="13" fill="var(--ink)">stable 100–200 m offset</text>
+        <text x="390" y="230" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--muted)">seeded by tool id — never re-rolled</text>
+
+        <!-- arrow 2 -->
+        <line x1="504" y1="126" x2="548" y2="126" stroke="var(--line-strong)" stroke-width="1.5" marker-end="url(#ar)"></line>
+
+        <!-- display zone -->
+        <rect x="560" y="26" width="152" height="200" rx="10" fill="var(--surface)" stroke="var(--line)"></rect>
+        <text x="572" y="48" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--muted)" letter-spacing="1.2">SHOWN</text>
+        <text x="636" y="106" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="600" font-size="21" fill="var(--ink)">350 m</text>
+        <text x="636" y="126" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--muted)">rounded to 50 m</text>
+        <text x="636" y="160" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="600" font-size="15" fill="var(--ink)">Florentin</text>
+        <text x="636" y="180" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--muted)">coarse label</text>
+        <text x="636" y="208" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--muted)">circle, not a pin</text>
+
+        <!-- release path -->
+        <path d="M114 226 L114 246 L636 246 L636 232" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4"></path>
+        <rect x="256" y="234" width="248" height="22" rx="11" fill="var(--accent-soft)"></rect>
+        <text x="380" y="249" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--accent-ink)">exact address released ONLY after accept</text>
+      </svg>
+      <figcaption>
+        The one read path to a real coordinate is <code>get_pickup_location(transaction_id)</code> — a
+        <code>SECURITY DEFINER</code> function that checks the caller is a participant <em>and</em> the
+        transaction is at least <code>agreed</code>. There is no other.
+      </figcaption>
+    </figure>
+
+    <h3>Why the fuzz is deterministic</h3>
+    <p>
+      This is the detail most implementations get wrong. If the published point re-randomises on every
+      read, an attacker who reads the listing a few dozen times can average the noise away and recover the
+      true location. So the offset is derived once, from the tool id plus a server-side salt, and never
+      re-rolled. For the same reason displayed distances are rounded to 50&nbsp;m: precise distances from
+      three vantage points trilaterate a position, rounded ones do not.
+    </p>
+    <p>
+      And one thing that quietly undoes all of it if you forget: <strong>GPS EXIF is stripped from every
+      photo on the device before upload.</strong> A listing photo taken in a living room otherwise carries
+      the exact coordinates in its metadata.
+    </p>
+
+    <h3>Who can read what</h3>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Data</th><th>Readable by</th></tr></thead>
+      <tbody>
+        <tr><td>Active listings, public columns</td><td>Everyone, guests included — deliberately</td></tr>
+        <tr><td><strong>Writing anything</strong> — a request, a message, a listing, a rating</td><td><strong>Members only.</strong> <code>is_member()</code> reads the <code>is_anonymous</code> JWT claim and gates every content-creating policy, so the rule holds for every client — including a hand-rolled one holding a stolen anon key</td></tr>
+        <tr><td>Draft, paused and removed listings</td><td>Owner only</td></tr>
+        <tr><td><strong>Exact tool coordinates</strong></td><td><strong>Owner only</strong>, plus the counterparty via the RPC after acceptance</td></tr>
+        <tr><td>Phone, email, home point</td><td>Self only</td></tr>
+        <tr><td>Requests, transactions</td><td>The two parties</td></tr>
+        <tr><td>Messages</td><td>Participants of that conversation</td></tr>
+        <tr><td>Ratings</td><td>Published ones publicly; your own always</td></tr>
+        <tr><td>Disputes and evidence photos</td><td>Participants + admins, private bucket, signed URLs</td></tr>
+        <tr><td>AI query cache</td><td>Service role — no policy at all</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>
+      Two RLS habits worth stating because they are easy to get wrong: every write policy names both
+      <code>USING</code> and <code>WITH CHECK</code> — a <code>USING</code>-only update policy lets a user
+      move a row out of their own visibility. And every <code>SECURITY DEFINER</code> function sets
+      <code>search_path = public</code>, without which a caller can shadow a name and hijack the definer's
+      privileges.
+    </p>
+
+    <h3>Secrets</h3>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Secret</th><th>Lives in</th><th>Never</th></tr></thead>
+      <tbody>
+        <tr><td>Gemini API key</td><td>Edge Function secret</td><td>The bundle, git, or an <code>EXPO_PUBLIC_*</code> var</td></tr>
+        <tr><td>Supabase <strong>service role</strong> key</td><td>Edge Function secret</td><td>The app. Ever. It bypasses all RLS</td></tr>
+        <tr><td>Supabase anon key</td><td>The app — correct and safe</td><td>—</td></tr>
+        <tr><td>Google Maps Android key</td><td>The app — unavoidable</td><td>Unrestricted. Lock to package + SHA-1, cap the quota, set a billing alert</td></tr>
+        <tr><td>Resend / SMTP credentials</td><td>Supabase Auth config, server side</td><td>The app or the repo</td></tr>
+        <tr><td>Turnstile secret key</td><td>Supabase Auth config</td><td>The app — the <em>site</em> key is public and belongs there</td></tr>
+        <tr><td>FCM service account</td><td>Uploaded to EAS</td><td>The repository</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Google Play</h3>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th>Requirement</th><th>Position</th></tr></thead>
+      <tbody>
+        <tr><td>Data Safety form</td><td>Filled from a real data inventory: approximate location, photos, name/email, messages, push identifiers — all app functionality, none shared, none for ads. Guests supply none of it, which is worth saying in the store listing: “browse without an account” is a real differentiator</td></tr>
+        <tr><td>Data deletion</td><td>In-app <em>and</em> a public web URL, both live before submission</td></tr>
+        <tr><td>Permissions</td><td>Coarse location, camera, media images, notifications, internet. No background location, no contacts. Each requested in context, after a rationale screen</td></tr>
+        <tr><td>Payments policy</td><td>Non-issue — Play excludes physical-goods rentals from Play Billing. We ship with no in-app payments anyway</td></tr>
+        <tr><td>UGC policy</td><td>Reporting, blocking, a published standard, a contactable owner. Marketplaces get scrutinised here — have the report flow working <em>before</em> review</td></tr>
+        <tr><td>Closed testing</td><td><span class="chip warn">Schedule risk</span> New personal developer accounts need ~12 testers for 14 continuous days before production access. <strong>Start on day one — this clock, not the code, is usually what delays launch</strong></td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="callout warn">
+      <span class="k">Not a technical problem</span>
+      <p>
+        <strong>Liability for injury and property damage.</strong> People will borrow circular saws. The
+        Terms must be explicit that Toolr is an introduction service that does not inspect or vet tools —
+        and the product must back that up by not implying vetting anywhere in the UI. The risk-level
+        acknowledgement on high-risk categories is both a safety measure and evidence of one.
+      </p>
+      <p>
+        <strong>Whether the platform becomes a party to the rental</strong> once money moves, and what
+        that means for Israeli consumer-protection and tax rules. This is the strongest argument for
+        keeping V1 free-or-cash-only: it defers the question until there is a product worth answering it
+        for. Both items need a lawyer before public launch, not a template.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 07 NEXT ============ -->
+  <section id="next">
+    <div class="sec-head"><span class="n">07</span><h2>What happens next</h2></div>
+
+    <p class="lede">
+      Six milestones, each ending in something demonstrable. The order is deliberate: the foundation
+      milestone is what makes every milestone after it boring.
+    </p>
+
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th style="width:34px">#</th><th>Milestone</th><th>Done when</th></tr></thead>
+      <tbody>
+        <tr><td class="num">01</td><td><strong>Foundation</strong> — Expo shell, theme tokens, primitives, i18n with RTL, Supabase project, migration applied, and the whole identity ladder: anonymous session, Google One Tap, email + password with confirmation and reset, custom SMTP, Turnstile</td><td>You open the app as a guest, heart a tool, sign in either way, and the heart is still there — and the shell mirrors correctly in Hebrew</td></tr>
+        <tr><td class="num">02</td><td><strong>Browse &amp; search</strong> — seed data, the geo RPC, list, map with clustering, filters, tool detail, every empty and error state</td><td>An anonymous user finds the Bosch drill on a map and reads its page, with no account</td></tr>
+        <tr><td class="num">03</td><td><strong>The 30-second listing</strong> — camera, resize, EXIF strip, the identify function, three confirmation variants, manual fallback</td><td>A non-technical person lists a real tool in under 60 seconds, <em>timed</em> — and the flow still completes with the Gemini key deliberately broken</td></tr>
+        <tr><td class="num">04</td><td><strong>The transaction loop</strong> — request, accept, push, pickup with location release, realtime chat, return, two-sided ratings</td><td>Two phones complete a full borrow end to end with nobody touching the database</td></tr>
+        <tr><td class="num">05</td><td><strong>Trust &amp; safety</strong> — profiles, report/block, disputes, notification prefs, account deletion, tool-request broadcasts, analytics</td><td>The Play Data Safety form can be filled truthfully from what the app actually does</td></tr>
+        <tr><td class="num">06</td><td><strong>Ship</strong> — legal docs, store listing in EN and HE, production build, closed testing, open testing in one neighbourhood</td><td>A real neighbour lists a real drill and a different real neighbour borrows it, unassisted</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Before any code — five things to set up</h3>
+    <ol>
+      <li><strong>Approve or amend this architecture</strong>, particularly Expo over Flutter and Supabase over Firebase.</li>
+      <li><strong>Create the Supabase project</strong> — region <code>eu-central-1</code>, closest to Israel and the easier privacy story.</li>
+      <li><strong>Create the Google Cloud project</strong> — Gemini key, Maps Android key with restrictions and a quota cap, OAuth client IDs.</li>
+      <li><strong>Set up email</strong> — a Resend account with SPF/DKIM verified on the sending domain, wired into Supabase as custom SMTP, with email confirmation and leaked-password protection switched on. Nothing about password sign-in works until this exists.</li>
+      <li><strong>Register the Play developer account</strong> — $25, and the 14-day closed-testing clock cannot start until it exists.</li>
+      <li><strong>Scaffold the repo and apply migration 001.</strong></li>
+    </ol>
+
+    <div class="callout">
+      <span class="k">The test to apply to every decision from here</span>
+      <p style="font-size:19px;line-height:1.5;">
+        Could my neighbour understand this without instructions? If not, simplify it. Toolr is not
+        equipment-management software — it is <em>I need a drill, someone nearby has one, borrow it.</em>
+        That simplicity is the entire product.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <div>Toolr · Phase 1 · Architecture &amp; MVP definition</div>
+    <div>Full detail, including the runnable migration, in <span class="mono">docs/</span> and <span class="mono">sql/001_initial_schema.sql</span></div>
+  </footer>
+
+  </main>
+</div>
+</div>
