@@ -1,0 +1,71 @@
+# Publish the web build to GitHub Pages.
+#
+# The point of this file is that the site stops depending on a laptop being
+# switched on. Every push to main rebuilds and redeploys; the URL never
+# changes.
+name: Deploy web
+
+on:
+  push: { branches: [main] }
+  # So you can redeploy from the Actions tab without pushing anything.
+  workflow_dispatch:
+
+# Pages needs these; without them the deploy step fails with a permissions
+# error that does not mention permissions.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. `cancel-in-progress: false` so a queued deploy is not
+# thrown away by a rapid second push — the later one waits its turn instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Project sites live under /<repo>, so the bundle has to be told its own
+      # base path or every asset resolves to the domain root and 404s.
+      EXPO_PUBLIC_BASE_URL: /${{ github.event.repository.name }}
+      # Publishable, by design: the anon key is meant to ship inside clients,
+      # and row-level security is what actually protects the data. The
+      # service-role key must never appear here.
+      EXPO_PUBLIC_SUPABASE_URL: https://ycdnowjhttgtskbilmnx.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_ajn8XyZz3VioMGIL0rnhYA_P-MhDN8x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+
+      - name: Build the web bundle
+        run: npx expo export --platform web
+
+      - name: Make it survive deep links and Jekyll
+        run: |
+          # GitHub Pages runs Jekyll by default, which silently skips any
+          # directory starting with an underscore — and Expo puts the entire
+          # bundle in _expo/. Without this the site loads a blank page.
+          touch dist/.nojekyll
+          # The app is a single-page bundle: only index.html exists, so opening
+          # /tool/123 directly would 404. Pages serves 404.html for unknown
+          # paths, so making it a copy of index.html hands those URLs to the
+          # router instead.
+          cp dist/index.html dist/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: dist }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+      - run: echo "Live at ${{ steps.deploy.outputs.page_url }}"

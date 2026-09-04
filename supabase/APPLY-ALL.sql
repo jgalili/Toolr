@@ -1,18 +1,14 @@
 -- =====================================================================
--- NailedIt — apply the whole database in one paste.
+-- NailedIt — every migration, concatenated, in order.
 --
--- Supabase dashboard -> SQL Editor -> New query -> paste this -> Run.
---
--- This is every migration in supabase/migrations/, concatenated in order.
--- It is safe to run on an empty project. Running it twice is safe too: the
--- seed checks for existing tools first and skips itself.
---
--- Generated file. Edit the migrations, not this.
+-- Generated from supabase/migrations/. Do not edit by hand: edit the
+-- migration and regenerate, or the two drift apart and this file starts
+-- re-creating functions a later migration deliberately removed.
 -- =====================================================================
 
-
--- ##########  20260101000000_initial_schema.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000000_initial_schema.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — initial schema (Postgres 15 + PostGIS, Supabase)
 -- Money is stored in AGOROT (integer). 100 agorot = 1 ILS. Never use float.
@@ -1013,8 +1009,9 @@ grant execute on function public.match_tool_request  to service_role;
 grant execute on function public.consume_ai_quota    to service_role;
 revoke execute on function public.fuzz_point from anon, authenticated;
 
--- ##########  20260101000100_rpcs.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000100_rpcs.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — write RPCs
 --
@@ -1477,8 +1474,9 @@ grant execute on function public.nearby_tool_requests      to anon, authenticate
 grant execute on function public.publish_stale_ratings     to service_role;
 grant execute on function public.expire_stale_requests     to service_role;
 
--- ##########  20260101000200_retention.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000200_retention.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — deletion & retention
 --
@@ -1581,8 +1579,9 @@ comment on column public.transactions.owner_id is
 comment on column public.ratings.rater_id is
   'NULL means the rater deleted their account. The rating stays; the identity does not.';
 
--- ##########  20260101000300_storage.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000300_storage.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — storage buckets
 --
@@ -1655,8 +1654,9 @@ begin
   return n;
 end $$;
 
--- ##########  20260101000500_pickup_and_items.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000500_pickup_and_items.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — pickup windows and "what's included", as structured rows
 --
@@ -1800,8 +1800,9 @@ end $$;
 grant execute on function public.set_pickup_windows(uuid, jsonb) to authenticated;
 grant execute on function public.set_included_items(uuid, jsonb) to authenticated;
 
--- ##########  20260101000600_seed_demo.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000600_seed_demo.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — demo seed data (Tel Aviv)
 --
@@ -2013,8 +2014,9 @@ begin
     (select count(*) from public.tool_included_items);
 end $$;
 
--- ##########  20260101000700_demo_helpers.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000700_demo_helpers.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — "make the demo mine"
 --
@@ -2100,8 +2102,9 @@ end $$;
 
 grant execute on function public.seed_demo_for_me() to authenticated;
 
--- ##########  20260101000800_demo_relocate.sql  ##########
-
+-- ---------------------------------------------------------------------
+-- 20260101000800_demo_relocate.sql
+-- ---------------------------------------------------------------------
 -- =====================================================================
 -- NailedIt — move the demo neighbourhood to wherever you are
 --
@@ -2180,3 +2183,489 @@ end $$;
 
 grant execute on function public.move_demo_tools_here(double precision, double precision)
   to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 20260101000900_demo_auto_reply.sql
+-- ---------------------------------------------------------------------
+-- =====================================================================
+-- NailedIt — let the demo neighbours answer
+--
+-- Borrow requests only become conversations when the OWNER accepts them.
+-- That is right for the product and useless for a demo: the seeded owners
+-- are fictional, so a request sent to Daniel or Yael stays pending forever
+-- and the Messages tab stays empty. Someone showing the app to a potential
+-- user taps Borrow, writes a message, and then has nothing to show.
+--
+-- This answers on their behalf — but only for requests the CALLER sent to a
+-- SEEDED owner. It cannot touch a request between two real people, and it
+-- cannot answer a request that isn't yours.
+--
+-- Demo affordance, like seed_demo_for_me(). Drop before a public launch.
+-- =====================================================================
+
+create or replace function public.demo_answer_my_requests()
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_demo_owners uuid[] := array[
+    '00000000-0000-4000-a000-000000000001',
+    '00000000-0000-4000-a000-000000000002',
+    '00000000-0000-4000-a000-000000000003',
+    '00000000-0000-4000-a000-000000000004',
+    '00000000-0000-4000-a000-000000000005',
+    '00000000-0000-4000-a000-000000000006'
+  ]::uuid[];
+  v_user     uuid := auth.uid();
+  v_req      public.borrow_requests;
+  v_conv     uuid;
+  v_tool     text;
+  v_answered integer := 0;
+begin
+  if not public.is_member() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
+
+  for v_req in
+    select * from public.borrow_requests
+     where borrower_id = v_user
+       and owner_id = any(v_demo_owners)
+       and status = 'pending'
+     order by created_at
+  loop
+    -- Exactly what respond_to_request(accepted) writes, in the same order.
+    update public.borrow_requests
+       set status = 'accepted', responded_at = now()
+     where id = v_req.id;
+
+    select title into v_tool from public.tools where id = v_req.tool_id;
+
+    insert into public.transactions (
+      request_id, tool_id, owner_id, borrower_id, status,
+      agreed_total_agorot, payment_mode, payment_status, payment_provider, due_at
+    ) values (
+      v_req.id, v_req.tool_id, v_req.owner_id, v_req.borrower_id, 'agreed',
+      v_req.quoted_total_agorot, v_req.payment_mode,
+      (case when v_req.payment_mode = 'free' then 'not_applicable' else 'pending' end)::payment_status,
+      case when v_req.payment_mode = 'free' then null else 'offline' end,
+      v_req.end_at
+    );
+
+    insert into public.conversations (tool_id, request_id, owner_id, borrower_id, last_message_at)
+    values (v_req.tool_id, v_req.id, v_req.owner_id, v_req.borrower_id, now())
+    returning id into v_conv;
+
+    -- The borrower's own message first, so the thread reads as a conversation
+    -- rather than starting with the owner talking to nobody.
+    if coalesce(btrim(v_req.message), '') <> '' then
+      insert into public.messages (conversation_id, sender_id, kind, body, created_at)
+      values (v_conv, v_req.borrower_id, 'text', v_req.message, v_req.created_at);
+    end if;
+
+    insert into public.messages (conversation_id, sender_id, kind, body, created_at)
+    values (v_conv, v_req.owner_id, 'system',
+            'Request accepted. Pickup details are now shared.', now() - interval '2 minutes');
+
+    insert into public.messages (conversation_id, sender_id, kind, body, created_at)
+    values (v_conv, v_req.owner_id, 'text',
+            'Sure — I''m around this evening. Message me when you set off.', now() - interval '1 minute');
+
+    insert into public.notifications (user_id, kind, title, body, route, payload)
+    values (
+      v_req.borrower_id, 'borrow_request_accepted',
+      'Request accepted', coalesce(v_tool, ''),
+      'nailedit://requests/' || v_req.id,
+      jsonb_build_object('request_id', v_req.id)
+    );
+
+    v_answered := v_answered + 1;
+  end loop;
+
+  return jsonb_build_object('ok', true, 'answered', v_answered);
+end $$;
+
+grant execute on function public.demo_answer_my_requests() to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 20260101001000_profile_identity.sql
+-- ---------------------------------------------------------------------
+-- =====================================================================
+-- NailedIt — keep a profile's name and picture in step with the identity
+-- it signed in with
+--
+-- provision_member() already reads `full_name` and `avatar_url` out of the
+-- auth metadata, but it has two gaps that show up the moment someone signs
+-- in with Google:
+--
+--   1. Google does not always spell it `avatar_url`. Depending on the flow
+--      the picture arrives as `picture`, and the name as `name` rather than
+--      `full_name`. Reading only one spelling silently produces a profile
+--      called "Neighbour" with no photo.
+--
+--   2. It is `on conflict do nothing`. Anyone who was a guest first — which
+--      is everyone, since the app opens as a guest — already has a profile
+--      row by the time they connect Google, so the good values are thrown
+--      away.
+--
+-- So: widen the key lookup, and add a function the app calls after sign-in
+-- that backfills only the fields that are still empty or still the
+-- placeholder. It never overwrites a name or picture a person chose.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- Where the identity providers actually put things.
+-- ---------------------------------------------------------------------
+create or replace function public.identity_display_name(p_meta jsonb)
+returns text language sql immutable as $$
+  select nullif(
+    split_part(
+      btrim(coalesce(
+        nullif(p_meta ->> 'full_name', ''),
+        nullif(p_meta ->> 'name', ''),
+        nullif(p_meta ->> 'first_name', ''),
+        nullif(p_meta ->> 'given_name', ''),
+        ''
+      )),
+      ' ', 1),
+    '');
+$$;
+
+create or replace function public.identity_avatar_url(p_meta jsonb)
+returns text language sql immutable as $$
+  select nullif(coalesce(
+    nullif(p_meta ->> 'avatar_url', ''),
+    nullif(p_meta ->> 'picture', ''),
+    ''
+  ), '');
+$$;
+
+-- ---------------------------------------------------------------------
+-- Provisioning, now reading both spellings.
+-- ---------------------------------------------------------------------
+create or replace function public.provision_member(
+  p_id uuid, p_email text, p_meta jsonb, p_email_confirmed timestamptz
+) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, first_name, avatar_url, verification_level)
+  values (
+    p_id,
+    coalesce(public.identity_display_name(p_meta), 'Neighbour'),
+    public.identity_avatar_url(p_meta),
+    (case when p_email_confirmed is not null then 'email' else 'none' end)::verification_level
+  )
+  on conflict (id) do nothing;
+
+  insert into public.user_private (user_id, email) values (p_id, p_email)
+  on conflict (user_id) do update set email = excluded.email;
+
+  insert into public.notification_prefs (user_id) values (p_id)
+  on conflict (user_id) do nothing;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- Backfill for a profile that already existed.
+--
+-- Deliberately conservative: it fills a name only if it is still the
+-- 'Neighbour' placeholder, and a picture only if there is none. Someone who
+-- picked their own avatar keeps it, even if Google has a photo.
+-- ---------------------------------------------------------------------
+create or replace function public.sync_profile_from_identity()
+returns jsonb
+language plpgsql security definer set search_path = public, auth as $$
+declare
+  v_user  uuid := auth.uid();
+  v_meta  jsonb;
+  v_name  text;
+  v_photo text;
+  v_row   public.profiles;
+begin
+  if not public.is_member() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
+
+  select raw_user_meta_data into v_meta from auth.users where id = v_user;
+  if v_meta is null then
+    return jsonb_build_object('ok', false, 'reason', 'no_identity');
+  end if;
+
+  v_name  := public.identity_display_name(v_meta);
+  v_photo := public.identity_avatar_url(v_meta);
+
+  update public.profiles p
+     set first_name = case
+           when coalesce(v_name, '') <> '' and p.first_name in ('Neighbour', '') then v_name
+           else p.first_name end,
+         avatar_url = case
+           when coalesce(v_photo, '') <> '' and coalesce(p.avatar_url, '') = '' then v_photo
+           else p.avatar_url end,
+         updated_at = now()
+   where p.id = v_user
+  returning * into v_row;
+
+  if v_row.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'no_profile');
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'first_name', v_row.first_name,
+    'avatar_url', v_row.avatar_url
+  );
+end $$;
+
+-- ---------------------------------------------------------------------
+-- Letting someone set their own.
+--
+-- `avatar_url` doubles as a preset marker: 'preset:<tool-type>' means "draw
+-- the built-in illustration", which is how a person with no photo still gets
+-- something recognisable. Constrained so the column cannot become a vector
+-- for arbitrary remote URLs pointing anywhere.
+-- ---------------------------------------------------------------------
+create or replace function public.set_my_avatar(p_avatar text)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_member() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
+
+  if p_avatar is not null
+     and p_avatar !~ '^preset:[a-z0-9-]{1,40}$'
+     and p_avatar !~ '^https://[A-Za-z0-9._~:/?#@!$&''()*+,;=%-]{4,500}$' then
+    raise exception 'Unsupported avatar' using errcode = '22023';
+  end if;
+
+  update public.profiles
+     set avatar_url = p_avatar, updated_at = now()
+   where id = auth.uid();
+end $$;
+
+create or replace function public.set_my_display_name(p_name text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_name text := btrim(coalesce(p_name, ''));
+begin
+  if not public.is_member() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
+  if char_length(v_name) < 1 or char_length(v_name) > 40 then
+    raise exception 'A name needs to be 1-40 characters' using errcode = '22023';
+  end if;
+
+  update public.profiles
+     set first_name = v_name, updated_at = now()
+   where id = auth.uid();
+end $$;
+
+grant execute on function public.sync_profile_from_identity() to authenticated;
+grant execute on function public.set_my_avatar(text)          to authenticated;
+grant execute on function public.set_my_display_name(text)    to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 20260101001100_demo_incoming.sql
+-- ---------------------------------------------------------------------
+-- =====================================================================
+-- NailedIt — let a demo neighbour ask to borrow YOUR tool
+--
+-- The lending half of the app is unreachable in a solo demo. You can list a
+-- tool, but nobody is going to ask for it, so Accept, "picked up", "returned"
+-- and rating-the-borrower never appear — the whole owner side of the product
+-- is invisible to the person you are showing it to.
+--
+-- This has one of the seeded neighbours send a real borrow request for a tool
+-- the caller owns, through the same table and the same shape as a genuine one.
+-- From there everything is the real flow: the request lands in the Inbox, the
+-- caller accepts it, a conversation and transaction are created by
+-- respond_to_request, reminders get scheduled, and both sides can rate.
+--
+-- Demo affordance. Drop before a public launch.
+-- =====================================================================
+
+create or replace function public.demo_borrow_my_tool(p_tool_id uuid default null)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_user     uuid := auth.uid();
+  -- Yael, from the seed. A different person from the one who lends the drill,
+  -- so a demo showing both directions does not look like one pen pal.
+  v_neighbour uuid := '00000000-0000-4000-a000-000000000002';
+  v_tool      public.tools;
+  v_days      integer := 2;
+  v_start     timestamptz := date_trunc('hour', now()) + interval '3 hours';
+  v_req       public.borrow_requests;
+begin
+  if not public.is_member() then
+    raise exception 'Sign in first' using errcode = '42501';
+  end if;
+
+  if not exists (select 1 from public.profiles where id = v_neighbour) then
+    return jsonb_build_object('ok', false, 'reason', 'no_demo_data');
+  end if;
+
+  select * into v_tool
+    from public.tools
+   where owner_id = v_user
+     and status = 'active'
+     and deleted_at is null
+     and (p_tool_id is null or id = p_tool_id)
+   order by created_at desc
+   limit 1;
+
+  if v_tool.id is null then
+    return jsonb_build_object('ok', false, 'reason', 'no_tool_of_yours');
+  end if;
+
+  if exists (
+    select 1 from public.borrow_requests
+     where tool_id = v_tool.id and borrower_id = v_neighbour and status = 'pending'
+  ) then
+    return jsonb_build_object('ok', false, 'reason', 'already_asked', 'tool', v_tool.title);
+  end if;
+
+  -- Same columns create_borrow_request writes, including the server-side quote,
+  -- so accepting it exercises the real code path rather than a special case.
+  insert into public.borrow_requests (
+    tool_id, borrower_id, owner_id, start_at, end_at, message,
+    quoted_total_agorot, payment_mode, risk_acknowledged
+  ) values (
+    v_tool.id, v_neighbour, v_user,
+    v_start, v_start + (v_days || ' days')::interval,
+    'Hi! Saw your ' || v_tool.title || ' — could I borrow it for a couple of days?',
+    case when v_tool.payment_mode = 'free' then null
+         else coalesce(v_tool.price_per_day_agorot, 0) * v_days end,
+    v_tool.payment_mode, true
+  ) returning * into v_req;
+
+  insert into public.notifications (user_id, kind, title, body, route, payload)
+  values (
+    v_user, 'borrow_request_received',
+    'New borrow request', v_tool.title,
+    'nailedit://requests/' || v_req.id,
+    jsonb_build_object('request_id', v_req.id, 'tool_id', v_tool.id)
+  );
+
+  return jsonb_build_object(
+    'ok', true, 'request_id', v_req.id, 'tool', v_tool.title
+  );
+end $$;
+
+grant execute on function public.demo_borrow_my_tool(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 20260101001200_respond_with_time.sql
+-- ---------------------------------------------------------------------
+-- =====================================================================
+-- NailedIt — let the owner say "yes, but Thursday"
+--
+-- respond_to_request() took a yes or a no and nothing else, so the borrower's
+-- proposed window was the only window on offer. In practice that is not how
+-- lending a drill goes: the answer is usually "sure, but I need it back by
+-- Thursday evening". With no way to express that, an owner's only options
+-- were to accept a date that does not suit them or to decline someone they
+-- were happy to lend to.
+--
+-- This adds an optional new return time. Everything else — the transaction,
+-- the conversation, the notification — is unchanged, and a null keeps the
+-- old behaviour exactly, so existing callers are unaffected.
+-- =====================================================================
+
+-- `create or replace` only replaces a function with the SAME argument list.
+-- Adding a parameter — even a defaulted one — creates a second function beside
+-- the first, and then a two-argument call matches both: the old one exactly,
+-- and the new one via its default. PostgreSQL refuses to guess and every
+-- existing caller breaks with "function ... is not unique". Explicit casts do
+-- not help, because the ambiguity is the arity, not the types.
+--
+-- So the old signature has to go before the new one takes its place.
+drop function if exists public.respond_to_request(uuid, request_status);
+
+create or replace function public.respond_to_request(
+  p_request_id uuid,
+  p_decision   request_status,
+  p_due_at     timestamptz default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_req  public.borrow_requests;
+  v_conv uuid;
+  v_tool text;
+  v_due  timestamptz;
+begin
+  select * into v_req from public.borrow_requests where id = p_request_id;
+  if v_req.id is null then
+    raise exception 'Request not found' using errcode = 'P0002';
+  end if;
+  if v_req.owner_id <> auth.uid() then
+    raise exception 'Only the owner can answer this request' using errcode = '42501';
+  end if;
+  if v_req.status <> 'pending' then
+    raise exception 'That request has already been answered' using errcode = '22023';
+  end if;
+  if p_decision not in ('accepted', 'declined') then
+    raise exception 'Invalid decision' using errcode = '22023';
+  end if;
+
+  -- The owner may move the return, but not to before the pickup, and not into
+  -- the past. Anything else is validated the same as the original window.
+  v_due := coalesce(p_due_at, v_req.end_at);
+  if v_due <= v_req.start_at then
+    raise exception 'The return has to be after the pickup' using errcode = '22023';
+  end if;
+  if v_due < now() - interval '1 hour' then
+    raise exception 'That return time has already passed' using errcode = '22023';
+  end if;
+
+  update public.borrow_requests
+     set status = p_decision,
+         responded_at = now(),
+         end_at = case when p_decision = 'accepted' then v_due else end_at end
+   where id = p_request_id;
+
+  select title into v_tool from public.tools where id = v_req.tool_id;
+
+  if p_decision = 'accepted' then
+    insert into public.transactions (
+      request_id, tool_id, owner_id, borrower_id, status,
+      agreed_total_agorot, payment_mode, payment_status, payment_provider, due_at
+    ) values (
+      v_req.id, v_req.tool_id, v_req.owner_id, v_req.borrower_id, 'agreed',
+      v_req.quoted_total_agorot, v_req.payment_mode,
+      (case when v_req.payment_mode = 'free' then 'not_applicable' else 'pending' end)::payment_status,
+      case when v_req.payment_mode = 'free' then null else 'offline' end,
+      v_due
+    );
+
+    insert into public.conversations (tool_id, request_id, owner_id, borrower_id, last_message_at)
+    values (v_req.tool_id, v_req.id, v_req.owner_id, v_req.borrower_id, now())
+    returning id into v_conv;
+
+    insert into public.messages (conversation_id, sender_id, kind, body)
+    values (v_conv, v_req.owner_id, 'system', 'Request accepted. Pickup details are now shared.');
+
+    -- If the owner moved the date, say so in the thread. A changed return time
+    -- that only appears on a status screen is a change the borrower will miss.
+    if p_due_at is not null and p_due_at <> v_req.end_at then
+      insert into public.messages (conversation_id, sender_id, kind, body)
+      values (
+        v_conv, v_req.owner_id, 'system',
+        'Return time set to ' || to_char(v_due at time zone 'Asia/Jerusalem', 'Dy DD Mon, HH24:MI')
+      );
+    end if;
+  end if;
+
+  insert into public.notifications (user_id, kind, title, body, route, payload)
+  values (
+    v_req.borrower_id,
+    (case when p_decision = 'accepted' then 'borrow_request_accepted'
+          else 'borrow_request_declined' end)::notification_kind,
+    case when p_decision = 'accepted' then 'Request accepted' else 'Request declined' end,
+    coalesce(v_tool, ''),
+    'nailedit://requests/' || v_req.id,
+    jsonb_build_object('request_id', v_req.id, 'due_at', v_due)
+  );
+end $$;
+
+grant execute on function public.respond_to_request(uuid, request_status, timestamptz)
+  to authenticated;
+

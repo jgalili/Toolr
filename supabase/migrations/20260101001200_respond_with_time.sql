@@ -13,6 +13,16 @@
 -- old behaviour exactly, so existing callers are unaffected.
 -- =====================================================================
 
+-- `create or replace` only replaces a function with the SAME argument list.
+-- Adding a parameter — even a defaulted one — creates a second function beside
+-- the first, and then a two-argument call matches both: the old one exactly,
+-- and the new one via its default. PostgreSQL refuses to guess and every
+-- existing caller breaks with "function ... is not unique". Explicit casts do
+-- not help, because the ambiguity is the arity, not the types.
+--
+-- So the old signature has to go before the new one takes its place.
+drop function if exists public.respond_to_request(uuid, request_status);
+
 create or replace function public.respond_to_request(
   p_request_id uuid,
   p_decision   request_status,
