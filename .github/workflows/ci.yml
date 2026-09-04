@@ -39,46 +39,71 @@ jobs:
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      # Each suite leaves rows behind, so each one starts from a schema built
+      # only from the migrations. Written once here and reused by the steps
+      # below; the old workflow inlined it before the transaction loop and
+      # nowhere else, so the deletion suite ran on top of the loop's users and
+      # died on a duplicate key.
       - name: Apply migrations
         run: |
-          set -e
-          $PSQL -v ON_ERROR_STOP=1 -f supabase/tests/_local_auth_stub.sql
+          set -euo pipefail
+          cat > /tmp/migrate.sh <<'SH'
+          set -euo pipefail
+          $PSQL -c 'drop schema if exists public cascade; create schema public;' >/dev/null
+          $PSQL -c 'drop schema if exists auth cascade;' >/dev/null
+          $PSQL -v ON_ERROR_STOP=1 -f supabase/tests/_local_auth_stub.sql >/dev/null
           for f in supabase/migrations/*.sql; do
-            case "$f" in
-              *storage*) echo "skip $f (needs the Supabase storage schema)"; continue ;;
-            esac
-            echo "applying $f"
-            $PSQL -v ON_ERROR_STOP=1 -f "$f"
+            case "$f" in *storage*) continue ;; esac
+            $PSQL -v ON_ERROR_STOP=1 -f "$f" >/dev/null
           done
+          SH
+          bash /tmp/migrate.sh
+          echo "Migrations applied cleanly."
 
+      # Three things every suite step needs, and none of them were here before:
+      #   2>&1     - `raise notice` writes to stderr, so `| tee` captured the
+      #              query output and dropped every PASS/FAIL line on the floor.
+      #   pipefail - `psql | tee` reports tee's exit code, so a suite that
+      #              aborted half way through still marked its step green.
+      #   ON_ERROR_STOP - stop at the first error instead of running the rest
+      #              of the file against an aborted transaction.
       - name: Guest boundary
-        run: $PSQL -1 -f supabase/tests/guest_boundary.sql | tee /tmp/guest.txt
+        run: |
+          set -euo pipefail
+          bash /tmp/migrate.sh
+          $PSQL -1 -v ON_ERROR_STOP=1 -f supabase/tests/guest_boundary.sql 2>&1 | tee /tmp/guest.txt
 
       - name: Transaction loop
         run: |
-          $PSQL -c 'drop schema public cascade; create schema public;' >/dev/null
-          $PSQL -c 'drop schema auth cascade;' >/dev/null
-          $PSQL -v ON_ERROR_STOP=1 -f supabase/tests/_local_auth_stub.sql
-          for f in supabase/migrations/*.sql; do
-            case "$f" in *storage*) continue ;; esac
-            $PSQL -v ON_ERROR_STOP=1 -f "$f"
-          done
-          $PSQL -1 -f supabase/tests/transaction_loop.sql | tee /tmp/loop.txt
+          set -euo pipefail
+          bash /tmp/migrate.sh
+          $PSQL -1 -v ON_ERROR_STOP=1 -f supabase/tests/transaction_loop.sql 2>&1 | tee /tmp/loop.txt
 
       - name: Deletion retention
-        run: $PSQL -1 -f supabase/tests/deletion_retention.sql | tee /tmp/delete.txt
+        run: |
+          set -euo pipefail
+          bash /tmp/migrate.sh
+          $PSQL -1 -v ON_ERROR_STOP=1 -f supabase/tests/deletion_retention.sql 2>&1 | tee /tmp/delete.txt
 
       - name: Assert the security guarantees held
         run: |
-          set -e
+          set -euo pipefail
           grep -q "guest CANNOT borrow ............ PASS" /tmp/loop.txt
           grep -q "guest CANNOT borrow ........ PASS"     /tmp/guest.txt
           # A non-owner must read zero rows from tool_locations.
           grep -qE "borrower reads tool_locations *\| *0" /tmp/loop.txt
-          grep -qE "pickup BEFORE accept *\| *0"          /tmp/loop.txt
+          # Accepting is what creates the transaction, and the transaction is
+          # what unlocks the address. Assert both halves: no transaction while
+          # the request is pending, and nothing to read without one.
+          grep -qE "no transaction before accept *\| *0" /tmp/loop.txt
+          grep -qE "pickup BEFORE accept *\| *0"         /tmp/loop.txt
+          # ... and that it IS released once the owner accepts, otherwise the
+          # line above would still pass with the whole feature broken.
+          grep -qE "pickup AFTER accept *\| *Vital St 12" /tmp/loop.txt
           # A duplicate pending request must be refused. This one silently
-          # stopped asserting once seed data existed — it now pins the tool id.
+          # stopped asserting once seed data existed - it now pins the tool id.
           grep -q "duplicate request blocked ...... PASS" /tmp/loop.txt
           # Deleting an account must not destroy the counterparty's record.
           grep -qE "counterparty transaction SURVIVES *\| *1" /tmp/delete.txt
+          grep -qE "borrower_id nulled, not orphaned *\| *true" /tmp/delete.txt
           echo "Security assertions held."
