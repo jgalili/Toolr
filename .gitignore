@@ -25,3 +25,6 @@ _superseded/
 *.tgz
 /ci.yml
 .delete-probe
+
+# Scratch left by tooling; safe to delete.
+_to_delete/

@@ -9,11 +9,12 @@ import { AppHeader } from '@/components/domain/AppHeader';
 import { Icon, type IconName } from '@/components/domain/Icon';
 import { OwnerCard } from '@/components/domain/OwnerCard';
 import { StreetMap } from '@/components/domain/map/StreetMap';
-import { LoanBadge, PriceLabel, RatingPill } from '@/components/domain/ToolCard';
+import { ExchangeCount, LoanBadge, PriceLabel, RatingPill } from '@/components/domain/ToolCard';
 import { SafetyNote } from '@/components/domain/SafetyNote';
 import { ToolIllustration } from '@/components/domain/ToolIllustration';
 import { Button, Chip, ErrorState, Screen, Skeleton, Text } from '@/components/primitives';
 import { useAuthGate } from '@/features/auth/useAuthGate';
+import { useSession } from '@/features/auth/session';
 import { useTool, useToggleFavorite } from '@/features/tools/hooks';
 import { useToolLoans } from '@/features/transactions/hooks';
 import { backIcon } from '@/i18n/direction';
@@ -140,6 +141,7 @@ export default function ToolDetail() {
   const { colors, spacing, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const { requireMember } = useAuthGate();
+  const { userId } = useSession();
   const toggleFavorite = useToggleFavorite();
 
   const { data: tool, isPending, error, refetch } = useTool(id);
@@ -173,6 +175,11 @@ export default function ToolDetail() {
   const canBorrow = tool.status === 'active';
   const today = todaysWindows(tool.pickupWindows);
   const loan = loanFor(tool.id);
+  // Your own listing is a different screen with the same content. Offering
+  // "Borrow" here was not merely odd -- the server refuses it with "you
+  // cannot borrow your own tool", and until now that refusal went nowhere,
+  // so the button simply did nothing.
+  const isMine = Boolean(userId) && tool.ownerProfile.id === userId;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -222,8 +229,19 @@ export default function ToolDetail() {
               <Text tone="muted">·</Text>
               <PriceLabel tool={tool} />
               <Text tone="muted">·</Text>
-              <RatingPill value={tool.owner.rating} size={16} />
+              {/* Tappable, and it says how many. A rating you cannot read the
+                  reviews behind is a number you are asked to take on trust,
+                  from strangers, about strangers. */}
+              <RatingPill
+                value={tool.owner.rating}
+                count={tool.owner.ratingCount}
+                size={16}
+                onPress={() => router.push(`/profile/${tool.ownerProfile.id}#reviews`)}
+              />
             </View>
+
+            {/* How many times this exact tool has gone out and come back. */}
+            <ExchangeCount count={tool.completedExchanges} />
 
             {tool.condition || (tool.brand && !tool.isModelConfirmed) ? (
               <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
@@ -361,30 +379,51 @@ export default function ToolDetail() {
           borderTopColor: colors.border,
         }}
       >
-        <Button
-          testID="borrow-button"
-          style={{ flex: 1 }}
-          label={canBorrow ? t('tool.borrow') : t('tool.askAvailability')}
-          onPress={() =>
-            requireMember(
-              { kind: 'borrow', name: tool.ownerProfile.firstName, tool: tool.title },
-              () => router.push(`/tool/${tool.id}/request`),
-            )
-          }
-        />
-        <Button
-          testID="message-button"
-          style={{ flex: 1 }}
-          variant="offer-outline"
-          label={t('tool.messageOwner')}
-          icon={<Icon name="message" color={colors.offer} size={19} />}
-          onPress={() =>
-            requireMember(
-              { kind: 'borrow', name: tool.ownerProfile.firstName, tool: tool.title },
-              () => router.push(`/tool/${tool.id}/request`),
-            )
-          }
-        />
+        {isMine ? (
+          <>
+            <Button
+              testID="edit-button"
+              style={{ flex: 1 }}
+              label={t('listing.edit')}
+              onPress={() => router.push(`/tool/${tool.id}/edit`)}
+            />
+            <Button
+              testID="requests-button"
+              style={{ flex: 1 }}
+              variant="offer-outline"
+              label={t('inbox.requests')}
+              icon={<Icon name="message" color={colors.offer} size={19} />}
+              onPress={() => router.push('/inbox')}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              testID="borrow-button"
+              style={{ flex: 1 }}
+              label={canBorrow ? t('tool.borrow') : t('tool.askAvailability')}
+              onPress={() =>
+                requireMember(
+                  { kind: 'borrow', name: tool.ownerProfile.firstName, tool: tool.title },
+                  () => router.push(`/tool/${tool.id}/request`),
+                )
+              }
+            />
+            <Button
+              testID="message-button"
+              style={{ flex: 1 }}
+              variant="offer-outline"
+              label={t('tool.messageOwner')}
+              icon={<Icon name="message" color={colors.offer} size={19} />}
+              onPress={() =>
+                requireMember(
+                  { kind: 'borrow', name: tool.ownerProfile.firstName, tool: tool.title },
+                  () => router.push(`/tool/${tool.id}/request`),
+                )
+              }
+            />
+          </>
+        )}
       </View>
     </View>
   );

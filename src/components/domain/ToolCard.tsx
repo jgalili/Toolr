@@ -66,13 +66,70 @@ export function PriceLabel({ tool, large }: { tool: ToolSummary; large?: boolean
 
 /** A single filled star and the number. Never a five-star row in a list — it is
  *  five times the ink for the same fact. */
-export function RatingPill({ value, size = 15 }: { value: number | null; size?: number }) {
+/**
+ * A star and a number — and, when there are reviews behind it, how many.
+ *
+ * The count is not decoration. A bare "4.8" invites the obvious question, and
+ * the app had no answer to it: there was nowhere to go and see who said so.
+ * Showing "4.8 (12)" and making the whole thing tappable turns a claim into
+ * something a borrower can check, which is the entire job of a rating in a
+ * marketplace between strangers.
+ */
+export function RatingPill({
+  value,
+  count,
+  size = 15,
+  onPress,
+}: {
+  value: number | null;
+  count?: number;
+  size?: number;
+  onPress?: () => void;
+}) {
   const { colors, spacing } = useTheme();
   if (value == null) return null;
-  return (
+
+  const body = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
       <Icon name="star" color={colors.star} size={size} filled strokeWidth={0} />
       <Text variant="bodyStrong">{formatRating(value)}</Text>
+      {count != null && count > 0 ? (
+        <Text
+          variant="caption"
+          tone="muted"
+          style={onPress ? { textDecorationLine: 'underline' } : undefined}
+        >
+          ({count})
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  if (!onPress) return body;
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8}>
+      {body}
+    </Pressable>
+  );
+}
+
+/**
+ * "Lent 11 times" — the most persuasive line a listing has.
+ *
+ * Only shown once it is true. A badge reading "lent 0 times" on every new
+ * listing would make the whole neighbourhood look unused, and would tell a
+ * borrower nothing they could not already infer.
+ */
+export function ExchangeCount({ count }: { count: number }) {
+  const { t } = useTranslation();
+  const { colors, spacing } = useTheme();
+  if (!count || count < 1) return null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <Icon name="check" color={colors.offer} size={13} strokeWidth={2.5} />
+      <Text variant="caption" tone="offer">
+        {t('tool.lentTimes', { count })}
+      </Text>
     </View>
   );
 }
@@ -238,6 +295,7 @@ export function ToolCard({
         </View>
 
         <DistanceLine tool={tool} />
+        <ExchangeCount count={tool.completedExchanges} />
         {loan ? <LoanBadge line={loan} /> : null}
 
         <View

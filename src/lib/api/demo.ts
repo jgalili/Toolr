@@ -72,6 +72,7 @@ function summarise(tool: ToolDetail, centre: Coords): ToolSummary {
     title: tool.title,
     toolType: tool.toolType,
     brand: tool.brand,
+    completedExchanges: tool.completedExchanges,
     categoryId: tool.categoryId,
     categorySlug: tool.categorySlug,
     paymentMode: tool.paymentMode,
@@ -260,6 +261,8 @@ export const demoSource: DataSource = {
       title: input.title,
       toolType: input.toolType,
       brand: input.brand,
+      // A brand-new listing has been lent zero times, and says so.
+      completedExchanges: 0,
       model: input.model,
       isModelConfirmed: input.isModelConfirmed,
       includedItems: input.accessories
@@ -309,6 +312,41 @@ export const demoSource: DataSource = {
     await wait(150);
     const tool = tools.find((t) => t.id === id);
     if (tool) tool.status = status;
+  },
+
+  async updateTool(id, patch) {
+    await wait(200);
+    const tool = tools.find((t) => t.id === id);
+    if (!tool) return;
+    const has = (key: string) => Object.prototype.hasOwnProperty.call(patch, key);
+    if (patch.title != null) tool.title = patch.title;
+    if (has('description')) tool.description = patch.description ?? null;
+    if (patch.condition != null) tool.condition = patch.condition;
+    if (has('accessories')) tool.accessories = patch.accessories ?? null;
+    if (has('instructions')) tool.instructions = patch.instructions ?? null;
+    if (has('maxBorrowDays')) tool.maxBorrowDays = patch.maxBorrowDays ?? null;
+    if (patch.availabilityMode != null) tool.availabilityMode = patch.availabilityMode;
+    // The same pairing rule the server enforces, so demo mode cannot show a
+    // state the real backend would refuse.
+    if (patch.isFree != null) {
+      tool.paymentMode = patch.isFree ? 'free' : 'offline';
+      if (patch.isFree) tool.pricePerDayAgorot = null;
+    }
+    if (!patch.isFree && patch.pricePerDayAgorot != null) {
+      tool.pricePerDayAgorot = patch.pricePerDayAgorot;
+    }
+  },
+
+  async removeTool(id) {
+    await wait(200);
+    const index = tools.findIndex((t) => t.id === id);
+    if (index >= 0) tools.splice(index, 1);
+  },
+
+  async replaceToolPhoto(id, photoUri) {
+    await wait(200);
+    const tool = tools.find((t) => t.id === id);
+    if (tool) tool.photos = [photoUri];
   },
 
   async getFavorites() {
@@ -496,6 +534,12 @@ export const demoSource: DataSource = {
   async getConversations() {
     await wait(150);
     return conversations;
+  },
+
+  async hideConversation(conversationId) {
+    await wait(150);
+    const index = conversations.findIndex((c) => c.id === conversationId);
+    if (index >= 0) conversations.splice(index, 1);
   },
 
   async getMessages(conversationId) {

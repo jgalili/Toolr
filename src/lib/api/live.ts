@@ -40,7 +40,7 @@ import type {
 
 import { DEFAULTS } from '../config';
 import { requireSupabase } from '../supabase';
-import type { DataSource, IdentifyOutcome, SearchParams } from './types';
+import type { DataSource, IdentifyOutcome, SearchParams, ToolPatch } from './types';
 
 const TOOL_PHOTOS_BUCKET = 'tool-photos';
 const AI_TEMP_BUCKET = 'ai-temp';
@@ -100,6 +100,7 @@ function mapSearchRow(row: any): ToolSummary {
     distanceM: row.distance_m,
     coords: { latitude: row.lat, longitude: row.lng },
     photoUrl: publicPhotoUrl(row.primary_photo, 600),
+    completedExchanges: row.completed_exchanges ?? 0,
     owner: {
       id: row.owner_id ?? '',
       firstName: row.owner_first_name ?? '',
@@ -190,6 +191,7 @@ export const liveSource: DataSource = {
       brand: row.brand,
       model: row.model,
       isModelConfirmed: row.is_model_confirmed,
+      completedExchanges: row.completed_exchanges ?? 0,
       includedItems: (row.tool_included_items ?? [])
         .sort((a: any, b: any) => a.position - b.position)
         .map((i: any) => ({ label: i.label, icon: i.icon ?? 'item' })),
@@ -330,6 +332,74 @@ export const liveSource: DataSource = {
     }
 
     return { id: toolId };
+  },
+
+  /**
+   * Change a published listing.
+   *
+   * Goes through an RPC rather than a plain UPDATE for the same reason
+   * creating one does: the price/free pair has to stay consistent, and moving
+   * a tool has to re-fuzz the public point without the exact one ever
+   * touching the public table. An RLS-permitted UPDATE could do neither.
+   *
+   * `undefined` means "leave it", `null` means "clear it", and the two are
+   * carried separately because PostgREST cannot tell them apart in JSON.
+   */
+  async updateTool(id, patch: ToolPatch) {
+    const supabase = requireSupabase();
+    const has = (key: keyof ToolPatch) => Object.prototype.hasOwnProperty.call(patch, key);
+    const { error } = await supabase.rpc('update_tool', {
+      p_tool_id: id,
+      p_title: patch.title ?? null,
+      p_description: patch.description ?? null,
+      p_condition: patch.condition ?? null,
+      p_accessories: patch.accessories ?? null,
+      p_instructions: patch.instructions ?? null,
+      p_max_borrow_days: patch.maxBorrowDays ?? null,
+      p_is_free: patch.isFree ?? null,
+      p_price_per_day_agorot: patch.pricePerDayAgorot ?? null,
+      p_availability_mode: patch.availabilityMode ?? null,
+      p_category_slug: patch.categorySlug ?? null,
+      p_address_line: patch.addressLine ?? null,
+      p_pickup_notes: patch.pickupNotes ?? null,
+      p_lat: patch.coords?.latitude ?? null,
+      p_lng: patch.coords?.longitude ?? null,
+      p_clear_description: has('description') && patch.description == null,
+      p_clear_accessories: has('accessories') && patch.accessories == null,
+      p_clear_instructions: has('instructions') && patch.instructions == null,
+      p_clear_max_days: has('maxBorrowDays') && patch.maxBorrowDays == null,
+    });
+    if (error) throw error;
+  },
+
+  async removeTool(id) {
+    const { error } = await requireSupabase().rpc('remove_tool', { p_tool_id: id });
+    if (error) throw error;
+  },
+
+  /**
+   * Swap the listing's photo.
+   *
+   * The old row is deleted rather than kept at a higher position: people who
+   * replace a photo mean "that one was wrong", and a gallery that keeps the
+   * bad shot around is not what they asked for. The storage object is left
+   * behind on purpose — an orphaned blob is cheap, and deleting the file
+   * before the row is what turns a slow network into a broken image.
+   */
+  async replaceToolPhoto(id, photoUri) {
+    const supabase = requireSupabase();
+    const path = `${await currentUserId()}/${id}/${Date.now()}.jpg`;
+    const body = await readImageForUpload(photoUri);
+    const { error: uploadError } = await supabase.storage
+      .from(TOOL_PHOTOS_BUCKET)
+      .upload(path, body, { contentType: 'image/jpeg', upsert: false });
+    if (uploadError) throw uploadError;
+
+    await supabase.from('tool_photos').delete().eq('tool_id', id);
+    const { error } = await supabase
+      .from('tool_photos')
+      .insert({ tool_id: id, storage_path: path, position: 0 });
+    if (error) throw error;
   },
 
   async setToolStatus(id, status) {
@@ -535,7 +605,18 @@ export const liveSource: DataSource = {
       .order('last_message_at', { ascending: false, nullsFirst: false });
     if (error) throw error;
 
-    return (data ?? []).map((row: any): Conversation => {
+    // Threads this person has cleared. Fetched separately rather than embedded:
+    // conversation_hides has no foreign key from conversations, and an embed
+    // across a missing relationship is a 400 (PGRST200) that supabase-js
+    // reports as an ordinary error — which is precisely how four screens in
+    // this app silently went blank once already.
+    const { data: hidden } = await supabase
+      .from('conversation_hides')
+      .select('conversation_id')
+      .eq('user_id', userId);
+    const hiddenIds = new Set((hidden ?? []).map((row: any) => row.conversation_id));
+
+    return (data ?? []).filter((row: any) => !hiddenIds.has(row.id)).map((row: any): Conversation => {
       const other = row.owner?.id === userId ? row.borrower : row.owner;
       const sorted = (row.messages ?? []).sort(
         (a: any, b: any) => Date.parse(b.created_at) - Date.parse(a.created_at),
@@ -557,6 +638,13 @@ export const liveSource: DataSource = {
         unread: Boolean(last && last.sender_id !== userId && !last.read_at),
       };
     });
+  },
+
+  async hideConversation(conversationId) {
+    const { error } = await requireSupabase().rpc('hide_conversation', {
+      p_conversation_id: conversationId,
+    });
+    if (error) throw error;
   },
 
   async getMessages(conversationId) {

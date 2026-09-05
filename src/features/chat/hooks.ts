@@ -14,6 +14,14 @@ export function useConversations() {
   return useQuery({ queryKey: chatKeys.conversations, queryFn: () => api.getConversations() });
 }
 
+export function useHideConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) => api.hideConversation(conversationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: chatKeys.conversations }),
+  });
+}
+
 export function useMessages(conversationId: string | undefined) {
   const queryClient = useQueryClient();
 

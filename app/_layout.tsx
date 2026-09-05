@@ -1,12 +1,15 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { t as translate } from 'i18next';
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthGateProvider } from '@/features/auth/useAuthGate';
+import { describeError } from '@/features/feedback/errors';
+import { ToastProvider, pushToast } from '@/features/feedback/toast';
 import { SessionProvider } from '@/features/auth/session';
 import { LocationProvider } from '@/features/location/useLocation';
 import { initI18n } from '@/i18n';
@@ -18,6 +21,28 @@ import { ThemeProvider, useTheme } from '@/theme';
 void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
+  /**
+   * Every failed mutation says something, once, in one place.
+   *
+   * This is the systemic half of a bug that kept being reported as separate
+   * dead buttons. Accept, decline, save a listing, send a message: each one
+   * called a mutation, each one had no `onError`, and so a considered 400 from
+   * Postgres — "that return time has already passed" — arrived and vanished.
+   * Wiring it here rather than at each call site means a new mutation is
+   * reported by default, and has to opt OUT of being heard.
+   *
+   * A mutation that handles its own errors sets `meta: { silent: true }`.
+   */
+  mutationCache: new MutationCache({
+    onError: (error, _vars, _ctx, mutation) => {
+      if (mutation.meta?.silent) return;
+      const { key } = describeError(error);
+      pushToast({
+        message: translate(`errors.${key}`, { defaultValue: translate('errors.generic') }),
+        tone: 'error',
+      });
+    },
+  }),
   defaultOptions: {
     queries: {
       retry: 1,
@@ -80,7 +105,9 @@ export default function RootLayout() {
             <SessionProvider>
               <LocationProvider>
                 <AuthGateProvider>
-                  <RootNavigator />
+                  <ToastProvider>
+                    <RootNavigator />
+                  </ToastProvider>
                 </AuthGateProvider>
               </LocationProvider>
             </SessionProvider>

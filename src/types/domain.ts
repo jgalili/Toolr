@@ -101,6 +101,15 @@ export type ToolSummary = {
   owner: Pick<PublicProfile, 'id' | 'firstName' | 'avatarUrl' | 'rating' | 'ratingCount'>;
   isFavorite?: boolean;
   /**
+   * How many times this tool has been lent and returned through the app.
+   *
+   * The single most informative thing a listing can say about itself, and
+   * strictly derived: recomputable from completed transactions at any time
+   * (see recount_tool_exchanges). A number that cannot be recomputed is a
+   * number that should not be shown.
+   */
+  completedExchanges: number;
+  /**
    * Only ever populated for YOUR OWN listings. Search results are all 'active'
    * by construction, so carrying it there would be noise.
    */

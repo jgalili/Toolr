@@ -6,13 +6,23 @@ import { useTheme } from '@/theme';
 type Props = {
   children: React.ReactNode;
   onPress?: () => void;
+  /** Long-press for the secondary action a row has — clearing a chat, say. */
+  onLongPress?: () => void;
   padded?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   testID?: string;
 };
 
-export function Card({ children, onPress, padded = true, style, accessibilityLabel, testID }: Props) {
+export function Card({
+  children,
+  onPress,
+  onLongPress,
+  padded = true,
+  style,
+  accessibilityLabel,
+  testID,
+}: Props) {
   const { colors, radius, spacing, shadow } = useTheme();
 
   const body = (
@@ -34,7 +44,7 @@ export function Card({ children, onPress, padded = true, style, accessibilityLab
     </View>
   );
 
-  if (!onPress) return body;
+  if (!onPress && !onLongPress) return body;
 
   return (
     <Pressable
@@ -42,6 +52,7 @@ export function Card({ children, onPress, padded = true, style, accessibilityLab
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
     >
       {body}

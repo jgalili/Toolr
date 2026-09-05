@@ -7,7 +7,14 @@ import { View } from 'react-native';
 import { useTheme } from '@/theme';
 
 import { markerGeometry, markerColour, markerSvg, meSvg, MARKER_COLOURS } from './markers';
-import { OSM_ATTRIBUTION, OSM_TILES, zoomForRadius, type StreetMapProps } from './types';
+import {
+  MAX_FIT_ZOOM,
+  OSM_ATTRIBUTION,
+  OSM_TILES,
+  boundsForRadius,
+  zoomForRadius,
+  type StreetMapProps,
+} from './types';
 
 /**
  * A real street map, on the web.
@@ -56,7 +63,14 @@ export function StreetMap({
     // Leaflet measures its container on creation. Inside a freshly laid-out
     // React tree that measurement is often zero, and the result is a map that
     // paints one tile in the corner until something else forces a resize.
-    const settle = setTimeout(() => instance.invalidateSize(), 120);
+    //
+    // The re-fit after that measurement is the point: only once the pane knows
+    // its real width can it choose a zoom that actually frames the radius we
+    // asked for. Fitting before then would use the zero-width measurement.
+    const settle = setTimeout(() => {
+      instance.invalidateSize();
+      instance.fitBounds(boundsForRadius(centre, radiusM), { maxZoom: MAX_FIT_ZOOM, animate: false });
+    }, 120);
     return () => {
       clearTimeout(settle);
       instance.remove();
@@ -139,13 +153,21 @@ export function StreetMap({
     );
   }, [me]);
 
-  // ── recentre when the subject changes ────────────────────────────────────
+  // ── reframe when the subject changes ─────────────────────────────────────
+  // fitBounds, not setView: the pane knows how wide it is and we do not. The
+  // old setView passed a zoom computed for a 256px-wide map, so on anything
+  // wider — which is every real screen — a pickup was framed streets too far
+  // out to be useful, and on a laptop it was a view of the whole district.
   useEffect(() => {
-    map.current?.setView(
-      [centre.latitude, centre.longitude],
-      zoomForRadius(radiusM, centre.latitude),
-      { animate: true },
-    );
+    map.current?.fitBounds(boundsForRadius(centre, radiusM), {
+      maxZoom: MAX_FIT_ZOOM,
+      animate: true,
+    });
+    // Depending on the primitives rather than the object identity: `centre` is
+    // a fresh object literal on every render of the parent, which as a
+    // dependency would re-frame the map — and cancel the user's own panning —
+    // several times a second while their position updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centre.latitude, centre.longitude, radiusM]);
 
   return (

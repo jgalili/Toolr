@@ -132,7 +132,13 @@
     "successfulExchanges": "{{count}} successful exchange",
     "successfulExchanges_other": "{{count}} successful exchanges",
     "noSlotsToday": "Ask the owner for a time",
-    "photoOf": "Photo {{index}} of {{total}}"
+    "photoOf": "Photo {{index}} of {{total}}",
+    "lentTimes": "Lent once through NailedIt",
+    "lentTimes_other": "Lent {{count}} times through NailedIt",
+    "reviewsCount": "{{count}} review",
+    "reviewsCount_other": "{{count}} reviews",
+    "readReviews": "Read the reviews",
+    "noReviewsYet": "No reviews yet."
   },
   "request": {
     "when": "When do you need it?",
@@ -223,7 +229,18 @@
     "availabilityHint": "You can change this any time from your tools.",
     "retakePhoto": "Retake photo",
     "perDayShort": "/ day",
-    "availabilityLabel": "Availability"
+    "availabilityLabel": "Availability",
+    "edit": "Edit listing",
+    "editSaved": "Saved.",
+    "save": "Save changes",
+    "noChanges": "Nothing to save yet.",
+    "removeTool": "Delete this listing",
+    "removeConfirmTitle": "Delete this listing?",
+    "removeConfirmBody": "It stops showing to neighbours right away. Past borrows keep their record.",
+    "removeConfirm": "Delete it",
+    "removed": "Listing deleted.",
+    "cannotRemoveOnLoan": "You can't delete this while it's out on loan.",
+    "changePhoto": "Change photo"
   },
   "ai": {
     "likely": "Likely",
@@ -332,7 +349,10 @@
     "returnBy": "Return {{when}} by {{time}}",
     "returnReminder": "You'll get a reminder before the end time.",
     "tomorrow": "tomorrow",
-    "you": "You"
+    "you": "You",
+    "clearTitle": "Clear your chat with {{name}}?",
+    "clearBody": "It leaves your list. They keep their copy, and it comes back if they write again.",
+    "clearConfirm": "Clear it"
   },
   "transaction": {
     "title": "Borrowing",
@@ -513,7 +533,23 @@
     "pickArea": "Pick my area",
     "signInRequired": "Sign in to do that.",
     "searchFailed": "Couldn't reach the tool listings.",
-    "searchFailedBody": "The app is configured but the request failed. Run `npm run doctor` — it names the step that is incomplete."
+    "searchFailedBody": "The app is configured but the request failed. Run `npm run doctor` — it names the step that is incomplete.",
+    "returnTimePassed": "That return time has already gone by. Pick a new one.",
+    "returnBeforePickup": "The return has to be after the pickup.",
+    "alreadyAnswered": "You've already answered this request.",
+    "notYourRequest": "Only the tool's owner can answer this.",
+    "alreadyRequested": "You already have a pending request for this tool.",
+    "ownTool": "This one's yours already.",
+    "toolUnavailable": "That tool isn't available right now.",
+    "loanFinished": "That borrow is already finished.",
+    "notAwaitingPickup": "That borrow isn't waiting to be picked up.",
+    "rateLater": "You can leave a review once the tool is back.",
+    "notYours": "You're not part of that borrow.",
+    "needsSafety": "Please confirm you know how to use this tool safely.",
+    "needsPrice": "A rental needs a price per day.",
+    "badName": "A name needs to be between 1 and 40 characters.",
+    "alreadyExists": "That already exists.",
+    "toolOnLoan": "You can't do that while the tool is out on loan."
   },
   "notifications": {
     "borrow_request_received": "{{name}} would like to borrow your {{tool}}",

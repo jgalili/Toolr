@@ -4,9 +4,19 @@ import { useTranslation } from 'react-i18next';
 import { FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar, Button, Card, EmptyState, SegmentedControl, Skeleton, Text } from '@/components/primitives';
+import {
+  Avatar,
+  Button,
+  Card,
+  EmptyState,
+  SegmentedControl,
+  Sheet,
+  Skeleton,
+  Text,
+} from '@/components/primitives';
 import { useSession } from '@/features/auth/session';
-import { useConversations } from '@/features/chat/hooks';
+import { describeError } from '@/features/feedback/errors';
+import { useConversations, useHideConversation } from '@/features/chat/hooks';
 import { WhenPicker } from '@/components/domain/WhenPicker';
 import { useIncomingRequests, useRespondToRequest } from '@/features/transactions/hooks';
 import { currentLocale } from '@/i18n';
@@ -33,6 +43,42 @@ export default function Inbox() {
   const requests = useIncomingRequests();
   const conversations = useConversations();
   const respond = useRespondToRequest();
+  const hideChat = useHideConversation();
+  const [clearing, setClearing] = useState<{ id: string; name: string } | null>(null);
+
+  /**
+   * Answer a request, and if the server refuses because of the date, put the
+   * date picker in front of the owner rather than leaving them to guess.
+   *
+   * The refusal itself is spoken by the app-wide toast (see app/_layout.tsx);
+   * what belongs here is the remedy, because only this screen knows that the
+   * fix is the picker two rows down.
+   */
+  function answer(request: { id: string; endAt: string }, decision: 'accepted' | 'declined') {
+    respond.mutate(
+      {
+        id: request.id,
+        decision,
+        dueAt:
+          decision === 'accepted' && editing === request.id
+            ? (dueDraft?.toISOString() ?? null)
+            : null,
+      },
+      {
+        onSuccess: () => {
+          setEditing(null);
+          setDueDraft(null);
+        },
+        onError: (error) => {
+          if (describeError(error).action !== 'adjustReturn') return;
+          setEditing(request.id);
+          // Default to a sensible future time rather than re-offering the one
+          // that was just rejected for being in the past.
+          setDueDraft(new Date(Date.now() + 24 * 60 * 60 * 1000));
+        },
+      },
+    );
+  }
 
   if (isGuest) {
     return (
@@ -126,20 +172,15 @@ export default function Inbox() {
                     fullWidth={false}
                     style={{ flex: 1 }}
                     loading={respond.isPending}
-                    onPress={() =>
-                      respond.mutate({
-                        id: item.id,
-                        decision: 'accepted',
-                        dueAt: editing === item.id ? (dueDraft?.toISOString() ?? null) : null,
-                      })
-                    }
+                    onPress={() => answer(item, 'accepted')}
                   />
                   <Button
                     label={t('inbox.decline')}
                     variant="secondary"
                     fullWidth={false}
                     style={{ flex: 1 }}
-                    onPress={() => respond.mutate({ id: item.id, decision: 'declined' })}
+                    disabled={respond.isPending}
+                    onPress={() => answer(item, 'declined')}
                   />
                 </View>
 
@@ -167,7 +208,17 @@ export default function Inbox() {
           contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}
           ListEmptyComponent={<EmptyState title={t('inbox.noChats')} />}
           renderItem={({ item }) => (
-            <Card onPress={() => router.push(`/chat/${item.id}`)} accessibilityLabel={item.counterparty.firstName}>
+            <Card
+              onPress={() => router.push(`/chat/${item.id}`)}
+              // Long-press to clear an old thread. Deliberately not a swipe:
+              // this list is also scrolled horizontally by nothing at all, and
+              // a swipe-to-delete next to a tab bar is how people delete
+              // conversations they meant to open.
+              onLongPress={() =>
+                setClearing({ id: item.id, name: item.counterparty.firstName })
+              }
+              accessibilityLabel={item.counterparty.firstName}
+            >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <Avatar uri={item.counterparty.avatarUrl} name={item.counterparty.firstName} size={44} />
                 <View style={{ flex: 1, gap: 2 }}>
@@ -192,6 +243,23 @@ export default function Inbox() {
           )}
         />
       )}
+
+      <Sheet visible={clearing != null} onClose={() => setClearing(null)}>
+        <View style={{ gap: spacing.md, padding: spacing.lg }}>
+          <Text variant="heading">{t('chat.clearTitle', { name: clearing?.name ?? '' })}</Text>
+          <Text variant="body" tone="secondary">
+            {t('chat.clearBody')}
+          </Text>
+          <Button
+            label={t('chat.clearConfirm')}
+            onPress={() => {
+              if (clearing) hideChat.mutate(clearing.id);
+              setClearing(null);
+            }}
+          />
+          <Button label={t('common.cancel')} variant="ghost" onPress={() => setClearing(null)} />
+        </View>
+      </Sheet>
     </View>
   );
 }

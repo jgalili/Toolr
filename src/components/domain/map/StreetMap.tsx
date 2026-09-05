@@ -5,7 +5,14 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { useTheme } from '@/theme';
 
 import { markerColour, markerGeometry, markerSvg, meSvg, MARKER_COLOURS } from './markers';
-import { OSM_ATTRIBUTION, OSM_TILES, zoomForRadius, type StreetMapProps } from './types';
+import {
+  MAX_FIT_ZOOM,
+  OSM_ATTRIBUTION,
+  OSM_TILES,
+  boundsForRadius,
+  zoomForRadius,
+  type StreetMapProps,
+} from './types';
 
 /**
  * The same real street map, on a phone.
@@ -82,6 +89,13 @@ function buildHtml(centre: { latitude: number; longitude: number }, zoom: number
     }).addTo(map));
   };
 
+  // Fitting a box beats setting a zoom, because only the WebView knows how
+  // wide it actually is. zoomForRadius has to assume a 256px-wide pane, and
+  // every doubling past that costs a whole zoom level -- on a phone in
+  // landscape, or a tablet, that framed a pickup a couple of streets too wide.
+  window.__fit = function (south, west, north, east) {
+    map.fitBounds([[south, west], [north, east]], { maxZoom: ${MAX_FIT_ZOOM}, animate: true });
+  };
   window.__setView = function (lat, lng, z) { map.setView([lat, lng], z, { animate: true }); };
   post({ type: 'ready' });
 </script>
@@ -157,22 +171,32 @@ export function StreetMap({
   React.useEffect(push, [push]);
 
   React.useEffect(() => {
+    const [[south, west], [north, east]] = boundsForRadius(centre, radiusM);
     web.current?.injectJavaScript(
-      `window.__setView && window.__setView(${centre.latitude}, ${centre.longitude}, ${zoomForRadius(radiusM, centre.latitude)}); true;`,
+      `window.__fit && window.__fit(${south}, ${west}, ${north}, ${east}); true;`,
     );
+    // See the web implementation: `centre` is a new object every render, so the
+    // primitives are the real dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centre.latitude, centre.longitude, radiusM]);
 
   const onMessage = useCallback(
     (event: WebViewMessageEvent) => {
       try {
         const data = JSON.parse(event.nativeEvent.data) as { type: string; id?: string };
-        if (data.type === 'ready') push();
+        if (data.type === 'ready') {
+          push();
+          const [[south, west], [north, east]] = boundsForRadius(centre, radiusM);
+          web.current?.injectJavaScript(
+            `window.__fit && window.__fit(${south}, ${west}, ${north}, ${east}); true;`,
+          );
+        }
         if (data.type === 'marker' && data.id) onMarkerPress?.(data.id);
       } catch {
         // A message we do not understand is not worth crashing a map over.
       }
     },
-    [onMarkerPress, push],
+    [onMarkerPress, push, centre, radiusM],
   );
 
   return (

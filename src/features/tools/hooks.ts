@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import type { ToolPatch } from '@/lib/api/types';
 import { capture } from '@/lib/analytics';
 import type { ListingInput } from '@/schemas/forms';
 import type { Coords, ToolFilters, ToolSummary } from '@/types/domain';
@@ -130,5 +131,42 @@ export function useSetToolStatus() {
     mutationFn: ({ id, status }: { id: string; status: 'active' | 'paused' | 'removed' }) =>
       api.setToolStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tools'] }),
+  });
+}
+
+export function useUpdateTool() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: ToolPatch }) => api.updateTool(id, patch),
+    onSuccess: (_data, { id, patch }) => {
+      capture('tool_listing_edited', { fields: Object.keys(patch).length });
+      // The detail view AND every list the tool appears in: a price change
+      // that shows on one screen and not the next reads as a failed save.
+      void queryClient.invalidateQueries({ queryKey: toolKeys.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: ['tools'] });
+    },
+  });
+}
+
+export function useRemoveTool() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.removeTool(id),
+    onSuccess: () => {
+      capture('tool_listing_removed');
+      void queryClient.invalidateQueries({ queryKey: ['tools'] });
+    },
+  });
+}
+
+export function useReplaceToolPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, photoUri }: { id: string; photoUri: string }) =>
+      api.replaceToolPhoto(id, photoUri),
+    onSuccess: (_data, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: toolKeys.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: ['tools'] });
+    },
   });
 }

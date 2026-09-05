@@ -20,6 +20,31 @@ import type {
 
 export type SearchParams = ToolFilters & { centre: Coords; limit?: number; offset?: number };
 
+/**
+ * The editable part of a listing.
+ *
+ * Every key optional, so a caller sends only what changed; `null` where the
+ * column is nullable means "clear this". Notably absent: `risk`, `toolType`
+ * and `brand` — what a thing IS does not change after you publish it, and a
+ * listing that can silently become a different tool is a listing a borrower
+ * cannot trust.
+ */
+export type ToolPatch = Partial<{
+  title: string;
+  description: string | null;
+  condition: 'like_new' | 'good' | 'worn';
+  accessories: string | null;
+  instructions: string | null;
+  maxBorrowDays: number | null;
+  isFree: boolean;
+  pricePerDayAgorot: number | null;
+  availabilityMode: 'now' | 'dates' | 'ask';
+  categorySlug: string;
+  addressLine: string;
+  pickupNotes: string;
+  coords: Coords;
+}>;
+
 export type IdentifyOutcome =
   | { ok: true; tier: 'high' | 'medium' | 'low'; identification: Identification; resultId: string | null }
   | { ok: false; code: 'not_a_tool' | 'quota_exceeded' | 'invalid_image' | 'model_failed' | 'unauthorized' | 'timeout' | 'offline' };
@@ -46,6 +71,19 @@ export interface DataSource {
   getMyTools(): Promise<ToolSummary[]>;
   createTool(input: ListingInput, photoUri: string | null): Promise<{ id: string }>;
   setToolStatus(id: string, status: 'active' | 'paused' | 'removed'): Promise<void>;
+  /**
+   * Change a published listing.
+   *
+   * A partial: only the fields present are written, because an edit screen
+   * that posts its whole model would overwrite anything it does not happen to
+   * show. `null` on a nullable field means "clear it" — the server has an
+   * explicit flag for that, so absent and null stay distinguishable.
+   */
+  updateTool(id: string, patch: ToolPatch): Promise<void>;
+  /** Soft delete. Refused while the tool is out on loan. */
+  removeTool(id: string): Promise<void>;
+  /** Replaces the listing's photo. */
+  replaceToolPhoto(id: string, photoUri: string): Promise<void>;
 
   // ── favourites (the one thing a guest may write) ──────────────────────────
   getFavorites(): Promise<ToolSummary[]>;
@@ -96,6 +134,14 @@ export interface DataSource {
 
   // ── chat ─────────────────────────────────────────────────────────────────
   getConversations(): Promise<Conversation[]>;
+  /**
+   * Clear a thread from YOUR list.
+   *
+   * Not a delete: the other person keeps their copy, including the system
+   * messages recording when the tool changed hands. It comes back if they
+   * write again, because a new message is not old mail.
+   */
+  hideConversation(conversationId: string): Promise<void>;
   getMessages(conversationId: string): Promise<Message[]>;
   sendMessage(conversationId: string, body: string, kind?: 'text' | 'quick_reply'): Promise<Message>;
   subscribeToMessages(conversationId: string, onMessage: (message: Message) => void): () => void;

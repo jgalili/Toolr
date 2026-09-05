@@ -132,7 +132,13 @@
     "successfulExchanges": "החלפה מוצלחת אחת",
     "successfulExchanges_other": "{{count}} החלפות מוצלחות",
     "noSlotsToday": "שאלו את הבעלים מתי נוח",
-    "photoOf": "תמונה {{index}} מתוך {{total}}"
+    "photoOf": "תמונה {{index}} מתוך {{total}}",
+    "lentTimes": "הושאל פעם אחת דרך NailedIt",
+    "lentTimes_other": "הושאל {{count}} פעמים דרך NailedIt",
+    "reviewsCount": "ביקורת אחת",
+    "reviewsCount_other": "{{count}} ביקורות",
+    "readReviews": "קראו את הביקורות",
+    "noReviewsYet": "אין עדיין ביקורות."
   },
   "request": {
     "when": "מתי אתם צריכים אותו?",
@@ -223,7 +229,18 @@
     "availabilityHint": "אפשר לשנות בכל רגע מתוך הכלים שלכם.",
     "retakePhoto": "צילום מחדש",
     "perDayShort": "ליום",
-    "availabilityLabel": "זמינות"
+    "availabilityLabel": "זמינות",
+    "edit": "עריכת פריט",
+    "editSaved": "נשמר.",
+    "save": "שמירת שינויים",
+    "noChanges": "אין עדיין מה לשמור.",
+    "removeTool": "מחיקת הפריט",
+    "removeConfirmTitle": "למחוק את הפריט?",
+    "removeConfirmBody": "הוא ייעלם מיד מהשכנים. השאלות קודמות נשמרות בהיסטוריה.",
+    "removeConfirm": "מחקו",
+    "removed": "הפריט נמחק.",
+    "cannotRemoveOnLoan": "אי אפשר למחוק בזמן שהפריט מושאל.",
+    "changePhoto": "החלפת תמונה"
   },
   "ai": {
     "likely": "ככל הנראה",
@@ -332,7 +349,10 @@
     "returnBy": "להחזיר {{when}} עד {{time}}",
     "returnReminder": "תישלח תזכורת לפני מועד הסיום.",
     "tomorrow": "מחר",
-    "you": "אני"
+    "you": "אני",
+    "clearTitle": "לנקות את הצ׳אט עם {{name}}?",
+    "clearBody": "הוא ייעלם מהרשימה שלכם. אצלם הוא נשאר, והוא יחזור אם הם יכתבו שוב.",
+    "clearConfirm": "נקו"
   },
   "transaction": {
     "title": "השאלה",
@@ -513,7 +533,23 @@
     "pickArea": "בחירת אזור",
     "signInRequired": "התחברו כדי לעשות את זה.",
     "searchFailed": "לא הצלחנו להגיע לרשימת הכלים.",
-    "searchFailedBody": "האפליקציה מוגדרת אבל הבקשה נכשלה. הריצו `npm run doctor` — הוא יגיד מה חסר."
+    "searchFailedBody": "האפליקציה מוגדרת אבל הבקשה נכשלה. הריצו `npm run doctor` — הוא יגיד מה חסר.",
+    "returnTimePassed": "מועד ההחזרה כבר עבר. בחרו מועד חדש.",
+    "returnBeforePickup": "ההחזרה חייבת להיות אחרי האיסוף.",
+    "alreadyAnswered": "כבר עניתם לבקשה הזו.",
+    "notYourRequest": "רק בעלי הכלי יכולים לענות לזה.",
+    "alreadyRequested": "יש לכם כבר בקשה פתוחה על הכלי הזה.",
+    "ownTool": "הכלי הזה כבר שלכם.",
+    "toolUnavailable": "הכלי הזה לא זמין כרגע.",
+    "loanFinished": "ההשאלה הזו כבר הסתיימה.",
+    "notAwaitingPickup": "ההשאלה הזו לא ממתינה לאיסוף.",
+    "rateLater": "אפשר לכתוב ביקורת אחרי שהכלי חוזר.",
+    "notYours": "אתם לא חלק מההשאלה הזו.",
+    "needsSafety": "אנא אשרו שאתם יודעים להשתמש בכלי בבטחה.",
+    "needsPrice": "להשכרה צריך מחיר ליום.",
+    "badName": "שם צריך להיות בין 1 ל-40 תווים.",
+    "alreadyExists": "זה כבר קיים.",
+    "toolOnLoan": "אי אפשר לעשות את זה בזמן שהפריט מושאל."
   },
   "notifications": {
     "borrow_request_received": "{{name}} רוצה לשאול את ה{{tool}} שלכם",

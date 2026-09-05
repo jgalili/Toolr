@@ -4,7 +4,7 @@ import {
   markerGeometry,
   markerSvg,
 } from '../src/components/domain/map/markers';
-import { zoomForRadius } from '../src/components/domain/map/types';
+import { MAX_FIT_ZOOM, boundsForRadius, zoomForRadius } from '../src/components/domain/map/types';
 
 describe('zoomForRadius', () => {
   it('zooms in as the area of interest shrinks', () => {
@@ -75,5 +75,56 @@ describe('markers', () => {
     for (const svg of [markerSvg('pickup', '#000'), markerSvg('tool', '#000')]) {
       expect(svg).not.toMatch(/url\(|<image|xlink:href|\bsrc=/);
     }
+  });
+});
+
+describe('boundsForRadius', () => {
+  const TEL_AVIV = { latitude: 32.0553, longitude: 34.7688 };
+
+  it('puts the centre in the middle of the box', () => {
+    const [[south, west], [north, east]] = boundsForRadius(TEL_AVIV, 300);
+    expect((south + north) / 2).toBeCloseTo(TEL_AVIV.latitude, 9);
+    expect((west + east) / 2).toBeCloseTo(TEL_AVIV.longitude, 9);
+  });
+
+  it('reaches the radius asked for, north and east', () => {
+    const metres = 250;
+    const [[south, west], [north, east]] = boundsForRadius(TEL_AVIV, metres);
+    // A degree of latitude is ~111.32 km everywhere.
+    expect(((north - south) / 2) * 111_320).toBeCloseTo(metres, 0);
+    // A degree of longitude is that, times cos(lat).
+    const lngMetres = ((east - west) / 2) * 111_320 * Math.cos((TEL_AVIV.latitude * Math.PI) / 180);
+    expect(lngMetres).toBeCloseTo(metres, 0);
+  });
+
+  it('makes the box WIDER in degrees than it is TALL, away from the equator', () => {
+    // The mistake this guards against is using one metres-per-degree figure
+    // for both axes: at 32 degrees a longitude degree is ~15% shorter, so an
+    // equal-degree box is squashed east-west and the pin drifts off-centre.
+    const [[south, west], [north, east]] = boundsForRadius(TEL_AVIV, 500);
+    expect(east - west).toBeGreaterThan(north - south);
+  });
+
+  it('is square in degrees at the equator, where the two agree', () => {
+    const [[south, west], [north, east]] = boundsForRadius({ latitude: 0, longitude: 0 }, 500);
+    expect(east - west).toBeCloseTo(north - south, 9);
+  });
+
+  it('never asks for a box so small the map zooms past where tiles exist', () => {
+    // fitBounds on a 1m box would land at zoom 20+, which OSM does not serve
+    // for most of the world -- a grey pane, which is the reported bug.
+    const [[south], [north]] = boundsForRadius(TEL_AVIV, 1);
+    expect((north - south) * 111_320).toBeGreaterThanOrEqual(40);
+    expect(MAX_FIT_ZOOM).toBeLessThanOrEqual(18);
+  });
+
+  it('frames a pickup tighter than the old tile-sized guess did', () => {
+    // The regression in one line: zoomForRadius assumes a 256px pane. On a
+    // 768px one it is two whole levels too far out. Fitting these bounds lets
+    // the pane pick for itself, so this only asserts the input is honest --
+    // exactly 2 x radius across, no padding baked in.
+    const metres = 220;
+    const [[south], [north]] = boundsForRadius(TEL_AVIV, metres);
+    expect((north - south) * 111_320).toBeCloseTo(metres * 2, 0);
   });
 });

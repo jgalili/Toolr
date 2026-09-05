@@ -64,7 +64,7 @@ export default function MyTools() {
                   {t('loan.notInSearch')}
                 </Text>
               ) : (
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
                   <Chip
                     label={t('listing.availableNow')}
                     selected={item.status === 'active'}
@@ -74,6 +74,14 @@ export default function MyTools() {
                     label={t('inbox.pending')}
                     selected={item.status === 'paused'}
                     onPress={() => setStatus.mutate({ id: item.id, status: 'paused' })}
+                  />
+                  {/* The way to a published listing's price, availability and
+                      details, and the only way to delete one. Here rather than
+                      buried in the listing itself, because this screen is
+                      where people come when they want to change something. */}
+                  <Chip
+                    label={t('common.edit')}
+                    onPress={() => router.push(`/tool/${item.id}/edit`)}
                   />
                 </View>
               )}

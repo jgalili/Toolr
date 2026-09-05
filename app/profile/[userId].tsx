@@ -72,24 +72,37 @@ export default function PublicProfile() {
           </View>
         ) : null}
 
-        {(ratings?.length ?? 0) > 0 ? (
-          <View style={{ gap: spacing.sm }}>
-            <Text variant="label" tone="muted" uppercase>
-              {t('profile.reviews')}
-            </Text>
-            {ratings!.map((rating) => (
+        {/* Always rendered, even empty.
+            Hiding this section when there are no reviews is what made the app
+            look like it was withholding them: the profile claimed a rating and
+            then showed nothing underneath, which reads as a broken screen
+            rather than as an honest "nobody has written one yet". */}
+        <View style={{ gap: spacing.sm }} testID="reviews">
+          <Text variant="label" tone="muted" uppercase>
+            {ratings && ratings.length > 0
+              ? `${t('profile.reviews')} · ${t('tool.reviewsCount', { count: ratings.length })}`
+              : t('profile.reviews')}
+          </Text>
+          {ratings && ratings.length > 0 ? (
+            ratings.map((rating) => (
               <Card key={rating.id}>
                 <View style={{ gap: spacing.xs }}>
                   <Stars value={rating.stars} size={13} />
                   {rating.comment ? <Text variant="body">{rating.comment}</Text> : null}
                   <Text variant="caption" tone="muted">
-                    {rating.raterName ?? ''}
+                    {[rating.raterName, formatMonthYear(rating.createdAt, currentLocale())]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Text>
                 </View>
               </Card>
-            ))}
-          </View>
-        ) : null}
+            ))
+          ) : (
+            <Text variant="body" tone="muted">
+              {t('tool.noReviewsYet')}
+            </Text>
+          )}
+        </View>
 
         <View style={{ gap: spacing.sm }}>
           <Button label={t('profile.reportUser')} variant="ghost" onPress={() => undefined} />

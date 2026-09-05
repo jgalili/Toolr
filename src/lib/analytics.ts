@@ -36,6 +36,8 @@ export type AnalyticsEvent =
   | 'ai_result_corrected'
   | 'ai_result_rejected'
   | 'tool_listing_created'
+  | 'tool_listing_edited'
+  | 'tool_listing_removed'
   | 'borrow_requested'
   | 'borrow_accepted'
   | 'borrow_declined'
