@@ -100,6 +100,11 @@ export type ToolSummary = {
   photoUrl: string | null;
   owner: Pick<PublicProfile, 'id' | 'firstName' | 'avatarUrl' | 'rating' | 'ratingCount'>;
   isFavorite?: boolean;
+  /**
+   * Only ever populated for YOUR OWN listings. Search results are all 'active'
+   * by construction, so carrying it there would be noise.
+   */
+  status?: ListingStatus;
 };
 
 export type ToolDetail = ToolSummary & {
@@ -170,12 +175,37 @@ export type Transaction = {
   status: TransactionStatus;
   agreedTotalAgorot: number | null;
   currency: string;
+  /** When the borrow was asked to START. Drives "Reserved 12-14 Sep". */
+  startAt: string | null;
   dueAt: string;
   pickedUpAt: string | null;
   returnedAt: string | null;
+  /**
+   * Whether the OWNER has confirmed the tool is back.
+   *
+   * Not the same as `status === 'returned'`, and the difference is the whole
+   * rule: the borrower saying they returned it moves the status, but only this
+   * flag puts the listing back into search.
+   */
+  ownerConfirmedReturn: boolean;
   completedAt: string | null;
   conversationId: string | null;
   hasRated: boolean;
+};
+
+/**
+ * Dates a tool is spoken for, as anyone browsing may see them.
+ *
+ * Deliberately anonymous. A reserved tool stays in search — a promise about
+ * next Tuesday should not hide a drill for a week — so people need to know
+ * which days are taken, and nothing more than that.
+ */
+export type ReservedWindow = {
+  toolId: string;
+  startAt: string;
+  endAt: string;
+  /** True once it has physically left; such a tool is not in search at all. */
+  isOut: boolean;
 };
 
 /** Only ever obtained from get_pickup_location(), after a request is accepted. */

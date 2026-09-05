@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Icon } from '@/components/domain/Icon';
+import { LoanBadge } from '@/components/domain/ToolCard';
 import { Button, Card, Text } from '@/components/primitives';
 import { currentLocale } from '@/i18n';
-import { formatDayTime } from '@/lib/format';
 import { useTheme } from '@/theme';
 import type { Transaction } from '@/types/domain';
 
-import { useConfirmPickup, useTransactions } from './hooks';
+import { useConfirmPickup, useConfirmReturn, useTransactions } from './hooks';
+import { isLiveLoan, loanLine, nextAction } from './loanState';
 
 /**
  * What is out right now.
@@ -26,10 +27,6 @@ import { useConfirmPickup, useTransactions } from './hooks';
  * somewhere you have to navigate to find.
  */
 
-function isLive(tx: Transaction): boolean {
-  return tx.status === 'agreed' || tx.status === 'picked_up' || tx.status === 'returned';
-}
-
 /** Soonest deadline first — the thing due tonight is the thing you care about. */
 function byDue(a: Transaction, b: Transaction): number {
   return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
@@ -40,35 +37,21 @@ function Row({ tx }: { tx: Transaction }) {
   const router = useRouter();
   const { spacing, colors } = useTheme();
   const confirmPickup = useConfirmPickup();
+  const confirmReturn = useConfirmReturn();
 
   const borrowing = tx.viewerRole === 'borrower';
-  const overdue = new Date(tx.dueAt).getTime() < Date.now();
+  const line = loanLine(tx, currentLocale());
+  const step = nextAction(tx);
 
-  // One next step per state, named as the thing you are about to do.
-  const action = (() => {
-    if (tx.status === 'agreed' && borrowing) {
-      return {
-        label: t('transaction.iPickedItUp'),
-        loading: confirmPickup.isPending,
-        onPress: () => confirmPickup.mutate(tx.id),
-      };
-    }
-    if (tx.status === 'picked_up') {
-      return {
-        label: t('transaction.markReturned'),
-        loading: false,
-        onPress: () => router.push(`/transaction/${tx.id}/return`),
-      };
-    }
-    if (tx.status === 'returned' && !tx.hasRated) {
-      return {
-        label: t('rating.title'),
-        loading: false,
-        onPress: () => router.push(`/transaction/${tx.id}/rate`),
-      };
-    }
-    return null;
-  })();
+  // One next step, and it is the same decision everywhere in the app — the
+  // screen only has to say where the tap goes.
+  const onPress = () => {
+    if (!step) return;
+    if (step.action === 'pickup') return void confirmPickup.mutate(tx.id);
+    if (step.action === 'confirmReturn') return void confirmReturn.mutate(tx.id);
+    if (step.action === 'return') return router.push(`/transaction/${tx.id}/return`);
+    return router.push(`/transaction/${tx.id}/rate`);
+  };
 
   return (
     <Card onPress={() => router.push(`/transaction/${tx.id}`)} accessibilityLabel={tx.toolTitle}>
@@ -80,25 +63,19 @@ function Row({ tx }: { tx: Transaction }) {
             size={18}
           />
           <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
-            {borrowing
-              ? t('home.youHave', { tool: tx.toolTitle, name: tx.counterparty.firstName })
-              : t('home.theyHave', { tool: tx.toolTitle, name: tx.counterparty.firstName })}
+            {tx.toolTitle}
           </Text>
         </View>
 
-        <Text variant="caption" tone={overdue ? 'danger' : 'muted'}>
-          {overdue
-            ? t('home.wasDue', { when: formatDayTime(tx.dueAt, currentLocale()) })
-            : t('transaction.dueBack', { when: formatDayTime(tx.dueAt, currentLocale()) })}
-        </Text>
+        <LoanBadge line={line} />
 
-        {action ? (
+        {step ? (
           <Button
-            label={action.label}
+            label={t(step.key)}
             variant="secondary"
             size="small"
-            loading={action.loading}
-            onPress={action.onPress}
+            loading={confirmPickup.isPending || confirmReturn.isPending}
+            onPress={onPress}
           />
         ) : null}
       </View>
@@ -111,7 +88,7 @@ export function ActiveBorrows() {
   const { spacing } = useTheme();
   const { data } = useTransactions();
 
-  const live = (data ?? []).filter(isLive).sort(byDue);
+  const live = (data ?? []).filter(isLiveLoan).sort(byDue);
   if (live.length === 0) return null;
 
   return (

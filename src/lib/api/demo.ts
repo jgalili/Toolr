@@ -224,6 +224,23 @@ export const demoSource: DataSource = {
       .map((t) => summarise(t, t.coords));
   },
 
+  async getReservedWindows(toolIds) {
+    await wait(60);
+    return transactions
+      .filter(
+        (tx) =>
+          toolIds.includes(tx.toolId) &&
+          (tx.status === 'agreed' || tx.status === 'picked_up') &&
+          !tx.ownerConfirmedReturn,
+      )
+      .map((tx) => ({
+        toolId: tx.toolId,
+        startAt: tx.startAt ?? tx.dueAt,
+        endAt: tx.dueAt,
+        isOut: tx.status === 'picked_up',
+      }));
+  },
+
   async getRatingsFor(userId) {
     await wait(120);
     return ratings.filter((r) => r.rateeId === userId);
@@ -393,9 +410,11 @@ export const demoSource: DataSource = {
       status: 'agreed',
       agreedTotalAgorot: request.quotedTotalAgorot,
       currency: 'ILS',
+      startAt: request.startAt,
       dueAt: dueAt ?? request.endAt,
       pickedUpAt: null,
       returnedAt: null,
+      ownerConfirmedReturn: false,
       completedAt: null,
       conversationId,
       hasRated: false,
@@ -424,18 +443,27 @@ export const demoSource: DataSource = {
   async confirmPickup(transactionId) {
     await wait(200);
     const tx = transactions.find((t) => t.id === transactionId);
-    if (tx) {
+    if (tx && tx.status === 'agreed') {
       tx.status = 'picked_up';
       tx.pickedUpAt = new Date().toISOString();
+      // Demo mirrors the trigger: out of the house means out of search.
+      const tool = tools.find((x) => x.id === tx.toolId);
+      if (tool && tool.status === 'active') tool.status = 'borrowed';
     }
   },
 
+  // Same asymmetry as the server: the borrower can say it is back, but only
+  // the owner's confirmation puts the listing back into search.
   async confirmReturn(transactionId) {
     await wait(200);
     const tx = transactions.find((t) => t.id === transactionId);
-    if (tx) {
-      tx.status = 'returned';
-      tx.returnedAt = new Date().toISOString();
+    if (!tx) return;
+    tx.status = 'returned';
+    tx.returnedAt = tx.returnedAt ?? new Date().toISOString();
+    if (tx.viewerRole === 'owner') {
+      tx.ownerConfirmedReturn = true;
+      const tool = tools.find((x) => x.id === tx.toolId);
+      if (tool && tool.status === 'borrowed') tool.status = 'active';
     }
   },
 

@@ -13,6 +13,7 @@ import type {
   ToolDetail,
   ToolFilters,
   ToolRequest,
+  ReservedWindow,
   ToolSummary,
   Transaction,
 } from '@/types/domain';
@@ -71,7 +72,14 @@ export interface DataSource {
   getTransaction(id: string): Promise<Transaction | null>;
   /** The ONLY path to a real coordinate, and only for an accepted transaction. */
   getPickupLocation(transactionId: string): Promise<PickupLocation | null>;
+  /**
+   * Records that the tool physically changed hands. Either side may call it —
+   * the owner watched it go and the borrower walked off with it, so making
+   * them agree on who taps is friction for its own sake.
+   */
   confirmPickup(transactionId: string): Promise<void>;
+  /** Anonymous "these dates are taken" for a screenful of cards, in one call. */
+  getReservedWindows(toolIds: string[]): Promise<ReservedWindow[]>;
   confirmReturn(transactionId: string): Promise<void>;
   submitRating(input: {
     transactionId: string;

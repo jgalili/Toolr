@@ -8,12 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/domain/AppHeader';
 import { Icon, type IconName } from '@/components/domain/Icon';
 import { OwnerCard } from '@/components/domain/OwnerCard';
-import { PriceLabel, RatingPill } from '@/components/domain/ToolCard';
+import { StreetMap } from '@/components/domain/map/StreetMap';
+import { LoanBadge, PriceLabel, RatingPill } from '@/components/domain/ToolCard';
 import { SafetyNote } from '@/components/domain/SafetyNote';
 import { ToolIllustration } from '@/components/domain/ToolIllustration';
 import { Button, Chip, ErrorState, Screen, Skeleton, Text } from '@/components/primitives';
 import { useAuthGate } from '@/features/auth/useAuthGate';
 import { useTool, useToggleFavorite } from '@/features/tools/hooks';
+import { useToolLoans } from '@/features/transactions/hooks';
 import { backIcon } from '@/i18n/direction';
 import { formatDistance } from '@/lib/format';
 import { useTheme } from '@/theme';
@@ -141,6 +143,7 @@ export default function ToolDetail() {
   const toggleFavorite = useToggleFavorite();
 
   const { data: tool, isPending, error, refetch } = useTool(id);
+  const loanFor = useToolLoans(id ? [id] : []);
 
   if (isPending) {
     return (
@@ -169,6 +172,7 @@ export default function ToolDetail() {
 
   const canBorrow = tool.status === 'active';
   const today = todaysWindows(tool.pickupWindows);
+  const loan = loanFor(tool.id);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -310,6 +314,10 @@ export default function ToolDetail() {
             </Panel>
           ) : null}
 
+          {/* Which days are already taken. Shown next to the borrow window so
+              nobody picks Tuesday and waits two days to be told it was gone. */}
+          {loan ? <LoanBadge line={loan} /> : null}
+
           {tool.maxBorrowDays ? (
             <Text variant="caption" tone="muted">
               {t('tool.maxDays', { count: tool.maxBorrowDays })}
@@ -318,26 +326,18 @@ export default function ToolDetail() {
 
           <SafetyNote risk={tool.risk} />
 
-          {/* A circle, not a pin, and it says so. */}
-          <View
-            style={{
-              height: 120,
-              borderRadius: radius.lg,
-              backgroundColor: colors.accentSoft,
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: spacing.xs,
-            }}
-          >
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                borderWidth: 2,
-                borderColor: colors.accent,
-                backgroundColor: `${colors.accent}22`,
-              }}
+          {/* A circle, not a pin, on a real street map.
+              The basemap is genuine so the neighbourhood is recognisable; the
+              circle is the honest part -- it says "somewhere in here", which is
+              all this screen is entitled to say before a borrow is agreed. The
+              exact doorway appears on the pickup screen, after accept. */}
+          <View style={{ gap: spacing.xs }}>
+            <StreetMap
+              testID="tool-area-map"
+              centre={tool.coords}
+              radiusM={260}
+              height={180}
+              circles={[{ id: 'approx', coords: tool.coords, radiusM: 180, kind: 'approx' }]}
             />
             <Text variant="caption" tone="muted">
               {t('tool.approximateArea')}

@@ -15,6 +15,7 @@ import {
   Text,
 } from '@/components/primitives';
 import { useAuthGate } from '@/features/auth/useAuthGate';
+import { useToolLoans } from '@/features/transactions/hooks';
 import { currentLocale } from '@/i18n';
 import { formatRadius } from '@/lib/format';
 import { useTheme } from '@/theme';
@@ -55,6 +56,7 @@ export function ResultsView({
   const { t } = useTranslation();
   const router = useRouter();
   const { spacing, colors, radius } = useTheme();
+  const loanFor = useToolLoans((tools ?? []).map((tool) => tool.id));
   const [view, setView] = useState<'list' | 'map'>('list');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { requireMember } = useAuthGate();
@@ -199,7 +201,12 @@ export function ResultsView({
   );
 
   const card = (item: ToolSummary) => (
-    <ToolCard tool={item} onPress={() => openTool(item)} onBorrow={() => borrow(item)} />
+    <ToolCard
+      tool={item}
+      loan={loanFor(item.id)}
+      onPress={() => openTool(item)}
+      onBorrow={() => borrow(item)}
+    />
   );
 
   /**

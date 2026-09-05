@@ -20,3 +20,8 @@ _superseded/
 *.apk
 *.aab
 *.keystore
+
+# Transfer bundles and stray copies from remote sessions.
+*.tgz
+/ci.yml
+.delete-probe
